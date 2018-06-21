@@ -57,6 +57,7 @@ class H5PlotGUI(QDialog):
 
     def axis_picker_event(self):
         self.logger.debug('Axis changed to: ' + self.axis)
+        self.axis = self.axis_picker.currentText()
 
     def solset_picker_event(self):
         self.logger.debug('Solset changed to: ' + self.solset_picker.currentText())
@@ -70,12 +71,19 @@ class H5PlotGUI(QDialog):
         self.logger.debug('Plotting button pressed.')
         self.plot()
 
-    def plot(self, labels=('x-axis', 'y-axis')):
+    def plot(self, labels=('x-axis', 'y-axis'), limits=([None,None], [None,None])):
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + ' for ' + self.solset.name)
         fig = plt.figure()
         ax =fig.add_subplot(111)
-        ax.plot(range(10), range(10))
-        ax.set(xlabel=labels[0], ylabel=labels[1])
+        ax.set_title(self.soltab.name + ' for ' + self.axis + '0 for CS001HBA0 and XX')
+        # Values have shape (timestamps, frequencies, antennas, polarizations).
+        if self.axis == 'time':
+            y_axis = self.soltab.getValues()[0][:, 0, 0, 0]
+        elif self.axis == 'freq':
+            y_axis = self.soltab.getValues()[0][0, :, 0, 0]
+        x_axis = self.soltab.getValues()[1][self.axis]
+        ax.plot(x_axis, y_axis, 'h')
+        ax.set(xlabel=self.axis, ylabel=labels[1], xlim=limits[0], ylim=limits[1])
         fig.show()
 
 
