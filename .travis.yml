@@ -3,6 +3,6 @@ python:
     - "3.6"
 install:
     - pip install matplotlib pylint pyqt5
-    - pip install --allow-external --upgrade --user https://github.com/revoltek/losoto/archive/master.zip
+    - pip install --upgrade https://github.com/revoltek/losoto/archive/master.zip
 script:
     - pylint h5plot.py --errors-only --extension-pkg-whitelist=PyQt5
