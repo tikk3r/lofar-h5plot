@@ -5,4 +5,4 @@ install:
     - pip install matplotlib pylint pyqt5
     - pip install --upgrade https://github.com/revoltek/losoto/archive/master.zip
 script:
-    - pylint h5plot.py --errors-only --extension-pkg-whitelist=PyQt5
+    - pylint h5plot.py --extension-pkg-whitelist=PyQt5
