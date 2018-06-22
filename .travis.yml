@@ -4,4 +4,4 @@ python:
 install:
     - pip install pylint
 script:
-    - pylint --errors-only --extension-pkg-whitelist=PyQt5
+    - pylint h5plot.py --errors-only --extension-pkg-whitelist=PyQt5
