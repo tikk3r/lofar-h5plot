@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QLabel, QPushButton, QWidget
+from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QLabel, QListWidget, QPushButton, QWidget
 
 import losoto.h5parm as lh5
 import matplotlib
@@ -20,6 +20,8 @@ class H5PlotGUI(QDialog):
 
         self.soltab_labels = self.solset.getSoltabNames()
         self.soltab = self.solset.getSoltab(self.soltab_labels[0])
+
+        self.stations = self.soltab.getValues()[1]['ant']
 
         self.move(300, 300)
         self.setWindowTitle('H5Plot')
@@ -44,6 +46,11 @@ class H5PlotGUI(QDialog):
         self.plot_button = QPushButton('Plot')
         self.plot_button.clicked.connect(self.plot_button_event)
 
+        self.station_picker = QListWidget()
+        self.station_picker.addItems(self.stations)
+        self.station_picker.setCurrentRow(0)
+
+
         plot_layout = QGridLayout()
         plot_layout.addWidget(self.soltab_label_y, 0, 0)
         plot_layout.addWidget(self.soltab_picker, 0, 1)
@@ -54,6 +61,7 @@ class H5PlotGUI(QDialog):
         layout.addRow(self.solset_label, self.solset_picker)
         layout.addRow(plot_layout)
         layout.addRow(self.plot_button)
+        layout.addRow(self.station_picker)
 
     def axis_picker_event(self):
         self.logger.debug('Axis changed to: ' + self.axis)
@@ -75,15 +83,21 @@ class H5PlotGUI(QDialog):
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + ' for ' + self.solset.name)
         fig = plt.figure()
         ax =fig.add_subplot(111)
-        ax.set_title(self.soltab.name + ' for ' + self.axis + '0 for CS001HBA0 and XX')
+        antenna = self.station_picker.currentRow()
+        print(self.stations[antenna])
+        ax.set_title(self.soltab.name + ' vs ' + self.axis + ' for ' + self.stations[antenna] + ' and XX')
         # Values have shape (timestamps, frequencies, antennas, polarizations).
+        values = self.soltab.getValues()[0]
         if self.axis == 'time':
-            y_axis = self.soltab.getValues()[0][:, 0, 0, 0]
+            y_axis = [values[:, 0, antenna, pol] for pol in range(values.shape[-1])]
         elif self.axis == 'freq':
-            y_axis = self.soltab.getValues()[0][0, :, 0, 0]
+            y_axis = [values[0, :, antenna, pol] for pol in range(values.shape[-1])]
+
         x_axis = self.soltab.getValues()[1][self.axis]
-        ax.plot(x_axis, y_axis, 'h')
+        for i,y in enumerate(y_axis):
+            ax.plot(x_axis, y, 'h', label=self.soltab.getValues()[1]['pol'][i])
         ax.set(xlabel=self.axis, ylabel=labels[1], xlim=limits[0], ylim=limits[1])
+        ax.legend()
         fig.show()
 
 
