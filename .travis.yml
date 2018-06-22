@@ -4,4 +4,4 @@ python:
 install:
     - pip install pylint
 script:
-    - pylint
+    - pylint --errors-only --extension-pkg-whitelist=PyQt5
