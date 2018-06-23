@@ -16,9 +16,9 @@ class H5PlotGUI(QDialog):
 
     From here the SolSets, SolTabs and antennas to plot are selected.
     """
-    def __init__(self, h5file, logger, parent=None):
+    def __init__(self, h5file, logging_instance, parent=None):
         super(H5PlotGUI, self).__init__(parent)
-        self.logger = logger
+        self.logger = logging_instance
 
         self.h5parm = lh5.h5parm(h5file)
         self.solset_labels = self.h5parm.getSolsetNames()
@@ -126,33 +126,33 @@ class H5PlotGUI(QDialog):
 
 
 if __name__ == '__main__':
-    filename = sys.argv[1]
-    h5file = lh5.h5parm(filename, readonly=True)
+    FILENAME = sys.argv[1]
+    H5FILE = lh5.h5parm(FILENAME, readonly=True)
     # Set up for logging output.
-    logger = logging.getLogger('H5plot_logger')
-    logger.setLevel(logging.DEBUG)
+    LOGGER = logging.getLogger('H5plot_logger')
+    LOGGER.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    logfileH = logging.FileHandler('h5plot.log')
-    logfileH.setLevel(logging.DEBUG)
-    logfileH.setFormatter(formatter)
-    logger.addHandler(logfileH)
+    LOGFILEH = logging.FileHandler('h5plot.log')
+    LOGFILEH.setLevel(logging.DEBUG)
+    LOGFILEH.setFormatter(formatter)
+    LOGGER.addHandler(LOGFILEH)
 
-    logger.info('Successfully opened '+filename)
-    solsets = h5file.getSolsetNames()
-    print('Found solset(s) '+ ', '.join(solsets))
-    for solset in solsets:
+    LOGGER.info('Successfully opened %s', FILENAME)
+    SOLSETS = H5FILE.getSolsetNames()
+    print('Found solset(s) '+ ', '.join(SOLSETS))
+    for solset in SOLSETS:
         print('SolTabs in ' + solset + ':')
-        ss = h5file.getSolset(solset)
+        ss = H5FILE.getSolset(solset)
         soltabs = ss.getSoltabNames()
         print('\t', end='')
         print(', '.join(soltabs))
 
     # Initialize the GUI.
-    app = QApplication(sys.argv)
-    gui = H5PlotGUI(filename, logger)
-    gui.show()
-    app.exec_()
+    APP = QApplication(sys.argv)
+    GUI = H5PlotGUI(FILENAME, LOGGER)
+    GUI.show()
+    APP.exec_()
 
-    h5file.close()
-    logger.info(filename + ' successfully closed.')
+    H5FILE.close()
+    LOGGER.info('%s successfully closed.', FILENAME)
