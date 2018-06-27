@@ -8,8 +8,9 @@ from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGrid
 
 import losoto.h5parm as lh5
 import matplotlib
-import matplotlib.pyplot as plt
 matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+plt.ion()
 
 class H5PlotGUI(QDialog):
     """The main GUI for H5Plot.
@@ -19,6 +20,7 @@ class H5PlotGUI(QDialog):
     def __init__(self, h5file, logging_instance, parent=None):
         super(H5PlotGUI, self).__init__(parent)
         self.logger = logging_instance
+        self.figures = []
 
         self.h5parm = lh5.h5parm(h5file)
         self.solset_labels = self.h5parm.getSolsetNames()
@@ -77,6 +79,11 @@ class H5PlotGUI(QDialog):
         self.logger.debug('Axis changed to: ' + self.axis_picker.currentText())
         self.axis = self.axis_picker.currentText()
 
+    def closeEvent(self, event):
+        self.logger.info('Closing all open figures before exiting.')
+        plt.close('all' )
+        event.accept()
+
     def _solset_picker_event(self):
         """Callback function for when the SolSet is changed.
 
@@ -108,20 +115,46 @@ class H5PlotGUI(QDialog):
         ax = fig.add_subplot(111)
         antenna = self.station_picker.currentRow()
         print(self.stations[antenna])
-        ax.set_title(self.soltab.name + ' vs ' + self.axis + ' for ' + self.stations[antenna] + \
-                     ' and XX')
+        ax.set_title(self.soltab.name + ' vs ' + self.axis + ' for ' + self.stations[antenna])
         # Values have shape (timestamps, frequencies, antennas, polarizations).
+        # For LoSoTo < 2.0 values have shape (polarizations, directions, antennas, frequencies, timestamps).
         values = self.soltab.getValues()[0]
-        if self.axis == 'time':
-            y_axis = [values[:, 0, antenna, pol] for pol in range(values.shape[-1])]
-        elif self.axis == 'freq':
-            y_axis = [values[0, :, antenna, pol] for pol in range(values.shape[-1])]
-
         x_axis = self.soltab.getValues()[1][self.axis]
-        for i, y in enumerate(y_axis):
-            ax.plot(x_axis, y, 'h', label=self.soltab.getValues()[1]['pol'][i])
+
+        # Common rotation angle has no polarization axis, so needs to be treated a bit differently.
+        if ('rotation' in self.soltab.name) and ('dir' in self.soltab.getValues()[1].keys()):
+            # LoSoTo 1.0 order
+            if self.axis == 'time':
+                y_axis = values[0, antenna, 0, :]
+            elif self.axis == 'freq':
+                y_axis = values[0, antenna, :, 0]
+            ax.plot(x_axis, y_axis, 'h')
+        else:
+            print(list(self.soltab.getValues()[1].keys()))
+            if ('dir' in self.soltab.getValues()[1].keys()) and (list(self.soltab.getValues()[1].keys())[-1] == 'time'):
+                # LoSoTo < 2.0 order; pick the 0th direction.
+                if self.axis == 'time':
+                    y_axis = [values[pol, 0, antenna, 0, :] for pol in range(values.shape[0])]
+                elif self.axis == 'freq':
+                    y_axis = [values[pol, 0, antenna, :, 0] for pol in range(values.shape[0])]
+            elif ('dir' in self.soltab.getValues()[1].keys()) and (list(self.soltab.getValues()[1].keys())[0] == 'time'):
+                # LoSoTo 2.0 order.
+                pass
+            elif ('dir' not in self.soltab.getValues()[1].keys()) and (list(self.soltab.getValues()[1].keys())[-1] == 'time'):
+                # LoSoTo < 2.0 order.
+                pass
+            elif ('dir' not in self.soltab.getValues()[1].keys()) and (list(self.soltab.getValues()[1].keys())[0] == 'time'):
+                # LoSoTo 2.0 order.
+                if self.axis == 'time':
+                    y_axis = [values[:, 0, antenna, pol] for pol in range(values.shape[-1])]
+                elif self.axis == 'freq':
+                    y_axis = [values[0, :, antenna, pol] for pol in range(values.shape[-1])]
+
+            for i, y in enumerate(y_axis):
+                ax.plot(x_axis, y, 'h', label=self.soltab.getValues()[1]['pol'][i])
+            ax.legend()
         ax.set(xlabel=self.axis, ylabel=labels[1], xlim=limits[0], ylim=limits[1])
-        ax.legend()
+        self.figures.append(fig)
         fig.show()
 
 
