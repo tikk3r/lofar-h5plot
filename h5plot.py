@@ -74,7 +74,7 @@ class H5PlotGUI(QDialog):
 
         Sets the `axis` attribute to the selected axis
         """
-        self.logger.debug('Axis changed to: ' + self.axis)
+        self.logger.debug('Axis changed to: ' + self.axis_picker.currentText())
         self.axis = self.axis_picker.currentText()
 
     def _solset_picker_event(self):
