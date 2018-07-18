@@ -5,4 +5,4 @@ install:
     - pip install matplotlib pylint pyqt5
     - pip install --upgrade https://github.com/revoltek/losoto/archive/master.zip
 script:
-    - pylint h5plot.py | grep rated | awk '{print $7}' | awk -F "/" '{print "![pylint Score](https://mperlet.github.io/pybadge/badges/"$1".svg)"}' | sed -re 's/[!.)(]/\\&/g' | sed -re 's/[]|[]/\\&/g' | xargs -I {} sed -re '2s$.*${}$' README.md
+    - pylint h5plot.py | grep rated | awk '{print $7}' | awk -F "/" '{print "![pylint Score](https://mperlet.github.io/pybadge/badges/"$1".svg)"}' | sed -re 's/[!.)(]/\\&/g' | sed -re 's/[]|[]/\\&/g' | xargs -I {} sed -re -i '2s$.*${}$' README.md
