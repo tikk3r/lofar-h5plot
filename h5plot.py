@@ -173,6 +173,7 @@ if __name__ == '__main__':
     LOGGER.addHandler(LOGFILEH)
 
     LOGGER.info('Successfully opened %s', FILENAME)
+
     SOLSETS = H5FILE.getSolsetNames()
     print('Found solset(s) '+ ', '.join(SOLSETS))
     for solset in SOLSETS:
