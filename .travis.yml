@@ -5,13 +5,13 @@ install:
 - pip install matplotlib pylint pyqt5
 - pip install --upgrade https://github.com/revoltek/losoto/archive/master.zip
 script:
-    - git clone https://${GH_TOKEN:-git}@github.com/tikk3r/lofar-h5plot.git && cd lofar-h5plot
+    - git clone https://${GH_TOKEN:-git}@github.com/tikk3r/lofar-h5plot.git && cd lofar-h5plot 
     - pylint --extension-pkg-whitelist=PyQt5 h5plot.py | grep rated | awk '{print $7}' | awk -F "/" '{print "![pylint Score](https://mperlet.github.io/pybadge/badges/"$1".svg)"}' | sed -r -e 's/[!.)(]/\\&/g' | sed -r -e 's/[]|[]/\\&/g' | xargs -I {} sed -i -r -e '2s$.*${}$' README.md; return 0;
     - git config --global user.email "travis@travis-ci.org"
     - git config --global user.name "Travis CI"
     - git add README.md
     - git commit -m "Travis - pylint badge. [ci skip]" --allow-empty
-    - git push origin master
+    - git push origin master &> /dev/null
 env:
   global:
   - secure: UUyb5so5YBRrByFnMIcK+8jSw05w2MWphs06gS+eOXWqgMkzKtPds/KkVKTDqtyh7G8UATJLsYsd4zv3sSyJydMtyRelTKhHaVWk2PojUUGeuPaAyz2PzOnryieLrPXcH3VgOoPXihZclTMnMX0ibY8/6kw+7yQHmA7GD5cFVEIiA9DzbObYzUmdTL6sJjcw4M5rntAps8B7tB7vThzcN9snO4wA2Rhbp9d2yEYYvDQ+8xkRj0N33RMmjwOvUHRtvoWmo5yMN97mvV9TmSvG6x2XaV1DDnSrNSp41Je36rAiPSb/IV1/vXC6Dod7cYmFVH1FL9NRqHyhYHhLA6Y6vJUnUD3xEMlL1z3QtDl+Ry69+98in1Vibh+/ewnAifCi9Utpi44z5UvcCLbHIPht20fr50zGFlZOVIYQUlfcYqC9kv2kUf5YanVJ/gQoiAVwsgtyx6WQ6feQO6J80UbuvDY3+GrKDx58EtXga/SD9gBj9HqozKLvwXR+wQlEoye8numBdl8FyCgmuqteeXmnsHbH5qXpPz2h1kM4w/eN/QyzniPecqCpUllRBMujLZcRK4uRb65L8cl13szFeL3EC+ha4aP1V6wrBAhxKWAZxH2w+Cw7l9Vz+nOAWFLTeHK8i99KOHWKyf8yPLFFbKcb/nRXu6qnv5BIpiXiLEsvcYc=
