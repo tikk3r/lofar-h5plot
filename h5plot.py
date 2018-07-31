@@ -4,13 +4,14 @@ import logging
 import signal
 import sys
 
-from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QLabel, \
+from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QLabel, \
     QListWidget, QPushButton
 
 import losoto.h5parm as lh5
 import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
+import numpy as np
 plt.ion()
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
@@ -33,6 +34,8 @@ class H5PlotGUI(QDialog):
         self.soltab = self.solset.getSoltab(self.soltab_labels[0])
 
         self.stations = self.soltab.getValues()[1]['ant']
+        self.refant = 'CS001HBA0'
+        self.wrapphase = True
 
         self.move(300, 300)
         self.setWindowTitle('H5Plot')
@@ -54,6 +57,15 @@ class H5PlotGUI(QDialog):
         self.axis_picker.activated.connect(self._axis_picker_event)
         self.axis = 'time'
 
+        self.refant_label = QLabel('Ref. Ant. ')
+        self.refant_picker = QComboBox()
+        self.refant_picker.addItems(self.stations)
+        self.refant_picker.activated.connect(self._refant_picker_event)
+
+        self.phasewrap_box = QCheckBox('Wrap Phases')
+        self.phasewrap_box.setChecked(True)
+        self.phasewrap_box.stateChanged.connect(self._phasewrap_event)
+
         self.plot_button = QPushButton('Plot')
         self.plot_button.clicked.connect(self._plot_button_event)
 
@@ -67,6 +79,9 @@ class H5PlotGUI(QDialog):
         plot_layout.addWidget(self.soltab_picker, 0, 1)
         plot_layout.addWidget(self.soltab_label_x, 0, 2)
         plot_layout.addWidget(self.axis_picker, 0, 3)
+        plot_layout.addWidget(self.refant_label, 1, 0)
+        plot_layout.addWidget(self.refant_picker, 1, 1)
+        plot_layout.addWidget(self.phasewrap_box, 1, 3)
 
         layout = QFormLayout(self)
         layout.addRow(self.solset_label, self.solset_picker)
@@ -87,6 +102,10 @@ class H5PlotGUI(QDialog):
         plt.close('all' )
         event.accept()
 
+    def _refant_picker_event(self):
+        self.logger.debug('Reference antenna changed to: ' + self.refant_picker.currentText())
+        self.refant = self.refant_picker.currentText()
+
     def _solset_picker_event(self):
         """Callback function for when the SolSet is changed.
 
@@ -103,6 +122,10 @@ class H5PlotGUI(QDialog):
         self.logger.debug('Soltab changed to: ' + self.soltab_picker.currentText())
         self.soltab = self.solset.getSoltab(self.soltab_picker.currentText())
 
+    def _phasewrap_event(self):
+        self.logger.debug('Phase wrapping changed to ' + str(self.phasewrap_box.isChecked()))
+        self.wrapphase = self.phasewrap_box.isChecked()
+
     def _plot_button_event(self):
         """Callback function for when the plot button is pressed.
 
@@ -117,6 +140,7 @@ class H5PlotGUI(QDialog):
         fig = plt.figure()
         ax = fig.add_subplot(111)
         antenna = self.station_picker.currentRow()
+        refantenna = self.refant_picker.currentIndex()
         ax.set_title(self.stations[antenna])
         # Values have shape (timestamps, frequencies, antennas, polarizations).
         # For LoSoTo < 2.0 values have shape (polarizations, directions, antennas, frequencies, timestamps).
@@ -131,6 +155,46 @@ class H5PlotGUI(QDialog):
             elif self.axis == 'freq':
                 y_axis = values[0, antenna, :, 0]
             ax.plot(x_axis, y_axis, 'h')
+        elif 'phase' in self.soltab.name:
+            print('Phase wrapping: ' + str(self.wrapphase))
+            if ('dir' in self.soltab.getValues()[1].keys()) and (
+                    list(self.soltab.getValues()[1].keys())[-1] == 'time'):
+                # LoSoTo < 2.0 order; pick the 0th direction.
+                if self.axis == 'time':
+                    if self.wrapphase:
+                        y_axis = [wrap_phase(values[pol, 0, antenna, 0, :] - values[pol, 0, refantenna, 0, :]) for pol in range(values.shape[0])]
+                    else:
+                        y_axis = [(values[pol, 0, antenna, 0, :] - values[pol, 0, refantenna, 0, :]) for pol in range(values.shape[0])]
+                elif self.axis == 'freq':
+                    if self.wrapphase:
+                        y_axis = [wrap_phase(values[pol, 0, antenna, :, 0] - values[pol, 0, refantenna, :, 0]) for pol in range(values.shape[0])]
+                    else:
+                        y_axis = [(values[pol, 0, antenna, :, 0] - values[pol, 0, refantenna, :, 0]) for pol in range(values.shape[0])]
+            elif ('dir' in self.soltab.getValues()[1].keys()) and (
+                    list(self.soltab.getValues()[1].keys())[0] == 'time'):
+                # LoSoTo 2.0 order.
+                pass
+            elif ('dir' not in self.soltab.getValues()[1].keys()) and (
+                    list(self.soltab.getValues()[1].keys())[-1] == 'time'):
+                # LoSoTo < 2.0 order.
+                pass
+            elif ('dir' not in self.soltab.getValues()[1].keys()) and (
+                    list(self.soltab.getValues()[1].keys())[0] == 'time'):
+                # LoSoTo 2.0 order.
+                if self.axis == 'time':
+                    if self.wrapphase:
+                        y_axis = [wrap_phase(values[:, 0, antenna, pol] - values[:, 0, refantenna, pol]) for pol in range(values.shape[-1])]
+                    else:
+                        y_axis = [(values[:, 0, antenna, pol] - values[:, 0, refantenna, pol]) for pol in range(values.shape[-1])]
+                elif self.axis == 'freq':
+                    if self.wrapphase:
+                        y_axis = [wrap_phase(values[0, :, antenna, pol] - values[0, :, refantenna, pol]) for pol in range(values.shape[-1])]
+                    else:
+                        y_axis = [(values[0, :, antenna, pol] - values[0, :, refantenna, pol]) for pol in range(values.shape[-1])]
+
+            for i, y in enumerate(y_axis):
+                ax.plot(x_axis, y, 'h', label=self.soltab.getValues()[1]['pol'][i])
+            ax.legend()
         else:
             if ('dir' in self.soltab.getValues()[1].keys()) and (list(self.soltab.getValues()[1].keys())[-1] == 'time'):
                 # LoSoTo < 2.0 order; pick the 0th direction.
@@ -158,13 +222,17 @@ class H5PlotGUI(QDialog):
         self.figures.append(fig)
         fig.show()
 
+def wrap_phase(phase):
+    wphase = (phase + np.pi) % (2 * np.pi) - np.pi
+    return wphase
 
 if __name__ == '__main__':
     FILENAME = sys.argv[1]
     H5FILE = lh5.h5parm(FILENAME, readonly=True)
     # Set up for logging output.
     LOGGER = logging.getLogger('H5plot_logger')
-    LOGGER.setLevel(logging.INFO)
+    #LOGGER.setLevel(logging.INFO)
+    LOGGER.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     LOGFILEH = logging.FileHandler('h5plot.log')
