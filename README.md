@@ -9,8 +9,9 @@ Inspect an H5Parm with
 # Requirements
 * Python 3
 * LoSoTo 2.0
-* PyQt5
 * Matplotlib
+* Numpy
+* PyQt5
 
 These can be installed through
 
