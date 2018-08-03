@@ -8,6 +8,8 @@ import sys
 from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QLabel, \
     QListWidget, QPushButton
 
+from losoto.lib_operations import reorderAxes
+
 import losoto.h5parm as lh5
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -65,6 +67,7 @@ class H5PlotGUI(QDialog):
 
         self.phasewrap_box = QCheckBox('Wrap Phases')
         self.phasewrap_box.setChecked(True)
+        self.phasewrap_box.setEnabled(False)
         self.phasewrap_box.stateChanged.connect(self._phasewrap_event)
 
         self.plot_button = QPushButton('Plot')
@@ -148,6 +151,14 @@ class H5PlotGUI(QDialog):
         values = self.soltab.getValues()[0]
         x_axis = self.soltab.getValues()[1][self.axis]
 
+        keys = self.soltab.getValues()[1].keys()
+        if ('dir' not in keys) and (keys != ['time', 'freq', 'ant', 'pol']):
+            self.logger.info('Reordering H5Parm axes to match [time, freq, ant, pol]...')
+            values = reorderAxes(values, self.soltab.getAxesNames(), ['time', 'freq', 'ant', 'pol'])
+        elif ('dir' in keys) and (keys != ['pol', 'dir', 'ant', 'freq', 'time']):
+            self.logger.info('Reordering H5Parm axes to match [pol, dir, ant, freq, time]...')
+            values = reorderAxes(values, self.soltab.getAxesNames(), ['pol', 'dir', 'ant', 'freq', 'time'])
+
         # Common rotation angle has no polarization axis, so needs to be treated a bit differently.
         if ('rotation' in self.soltab.name) and ('dir' in self.soltab.getValues()[1].keys()):
             # LoSoTo 1.0 order
@@ -160,6 +171,7 @@ class H5PlotGUI(QDialog):
             print('Phase wrapping: ' + str(self.wrapphase))
             if ('dir' in self.soltab.getValues()[1].keys()) and (
                     list(self.soltab.getValues()[1].keys())[-1] == 'time'):
+                print('dir keyword found')
                 # LoSoTo < 2.0 order; pick the 0th direction.
                 if self.axis == 'time':
                     if self.wrapphase:
