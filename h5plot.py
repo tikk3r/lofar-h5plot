@@ -177,7 +177,7 @@ class H5PlotGUI(QDialog):
                 else:
                     y_axis = values[:, 0, antenna, :, 0]
                 for i,y in enumerate(y_axis):
-                    ax.plot(x_axis, y[:,i])
+                    ax.plot(x_axis, y[:,i], 'h', label=self.stcache.values[1]['pol'][i])
             elif 'pol' in self.stcache.axes:
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
@@ -198,6 +198,10 @@ class H5PlotGUI(QDialog):
                         y_axis = wrap_phase(y_axis)
                 else:
                     y_axis = values[:, 0, antenna, 0]
+                ax.plot(x_axis, y_axis[:, i], 'h')
+            elif ('pol' not in self.stcache.axes) and ('dir' not in self.stcache.axes):
+                y_axis = values[:, 0, antenna]
+                ax.plot(x_axis, y_axis)
         elif self.axis == 'freq':
             if 'rotationmeasure' in self.soltab.name:
                 self.logger.warning('Rotation Measure does not support frequency axis! Switch to time instead.')
@@ -232,6 +236,9 @@ class H5PlotGUI(QDialog):
                         y_axis = wrap_phase(y_axis)
                 else:
                     y_axis = values[0, :, antenna, 0]
+            elif ('pol' not in self.stcache.axes) and ('dir' not in self.stcache.axes):
+                y_axis = values[0, :, antenna]
+                ax.plot(x_axis, y_axis)
 
         ax.set(xlabel=self.axis, ylabel=labels[1], xlim=limits[0], ylim=limits[1])
         if ax.get_legend_handles_labels()[1]:
@@ -261,6 +268,11 @@ def reorder_soltab(st):
     if 'dir' in order_old:
         order_new += ['dir']
     reordered = reorderAxes(st.getValues()[0], order_old, order_new)
+    reordered2 = {}
+    for k in order_new:
+        reordered2[k] = st.axes[k]
+    st.axes = reordered2
+    st.axesNames = order_new
     st_new = (reordered, st.getValues()[1])
     return st_new, order_new
 
