@@ -41,7 +41,8 @@ class H5PlotGUI(QDialog):
         self.wrapphase = True
 
         self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames())
-        reorder_soltab(self.soltab)
+        rvals, raxes = reorder_soltab(self.soltab)
+        self.stcache.update(rvals, raxes)
 
         self.move(300, 300)
         self.setWindowTitle('H5Plot')
@@ -240,6 +241,7 @@ class SoltabCache:
 
 def reorder_soltab(st):
     logging.info('Reordering soltab.')
+    print('Reordering soltab.')
     order_old = st.getAxesNames()
     order_new = ['time', 'freq', 'ant']
     print(order_old)
