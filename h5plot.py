@@ -167,7 +167,7 @@ class H5PlotGUI(QDialog):
             if 'rotationmeasure' in self.soltab.name:
                 y_axis = values[:, antenna]
                 ax.plot(x_axis, y_axis)
-            if ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
+            elif ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
