@@ -40,6 +40,8 @@ class H5PlotGUI(QDialog):
         self.refant = 'CS001HBA0'
         self.wrapphase = True
 
+        self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames())
+
         self.move(300, 300)
         self.setWindowTitle('H5Plot')
 
@@ -125,6 +127,8 @@ class H5PlotGUI(QDialog):
         """
         self.logger.debug('Soltab changed to: ' + self.soltab_picker.currentText())
         self.soltab = self.solset.getSoltab(self.soltab_picker.currentText())
+        rvals, raxes = reorder_soltab(self.soltab)
+        self.stcache.update(rvals, raxes)
 
     def _phasewrap_event(self):
         self.logger.debug('Phase wrapping changed to ' + str(self.phasewrap_box.isChecked()))
@@ -141,99 +145,110 @@ class H5PlotGUI(QDialog):
     def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
                          ' for ' + self.solset.name)
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+
         antenna = self.station_picker.currentRow()
         refantenna = self.refant_picker.currentIndex()
+        # Values have shape (timestamps, frequencies, antennas, polarizations, directions).
+        values = self.stcache.values[0]
+        x_axis = self.stcache.values[1][self.axis]
+        st_type = self.soltab.getType()
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
         ax.set_title(self.stations[antenna])
-        # Values have shape (timestamps, frequencies, antennas, polarizations).
-        # For LoSoTo < 2.0 values have shape (polarizations, directions, antennas, frequencies, timestamps).
-        values = self.soltab.getValues()[0]
-        x_axis = self.soltab.getValues()[1][self.axis]
 
-        keys = self.soltab.getValues()[1].keys()
-        if ('dir' not in keys) and (keys != ['time', 'freq', 'ant', 'pol']):
-            self.logger.info('Reordering H5Parm axes to match [time, freq, ant, pol]...')
-            values = reorderAxes(values, self.soltab.getAxesNames(), ['time', 'freq', 'ant', 'pol'])
-        elif ('dir' in keys) and (keys != ['pol', 'dir', 'ant', 'freq', 'time']):
-            self.logger.info('Reordering H5Parm axes to match [pol, dir, ant, freq, time]...')
-            values = reorderAxes(values, self.soltab.getAxesNames(), ['pol', 'dir', 'ant', 'freq', 'time'])
+        if self.axis == 'time':
+            if ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
+                if st_type == 'phase':
+                    ax.set_ylim(-np.pi, np.pi)
+                    # Plot phase-like quantities w.r.t. to a reference antenna.
+                    y_axis = values[:, 0, antenna, :, 0] - values[0, :, refantenna, :, 0]
+                    if self.wrapphase:
+                        y_axis = wrap_phase(y_axis)
+                else:
+                    y_axis = values[:, 0, antenna, :, 0]
+                for i,y in enumerate(y_axis):
+                    ax.plot(x_axis, y[:,i])
+            elif 'pol' in self.stcache.axes:
+                if st_type == 'phase':
+                    ax.set_ylim(-np.pi, np.pi)
+                    # Plot phase-like quantities w.r.t. to a reference antenna.
+                    y_axis = values[:, 0, antenna, :] - values[0, :, refantenna, :]
+                    if self.wrapphase:
+                        y_axis = wrap_phase(y_axis)
+                else:
+                    y_axis = values[:, 0, antenna, :]
+                for i in range(y_axis.shape[1]):
+                    ax.plot(x_axis, y_axis[:, i], 'h', label=self.stcache.values[1]['pol'][i])
+            elif 'dir' in self.stcache.axes:
+                if st_type == 'phase':
+                    ax.set_ylim(-np.pi, np.pi)
+                    # Plot phase-like quantities w.r.t. to a reference antenna.
+                    y_axis = values[:, 0, antenna, 0] - values[0, :, refantenna, 0]
+                    if self.wrapphase:
+                        y_axis = wrap_phase(y_axis)
+                else:
+                    y_axis = values[:, 0, antenna, 0]
+        elif self.axis == 'freq':
+            if ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
+                if st_type == 'phase':
+                    ax.set_ylim(-np.pi, np.pi)
+                    # Plot phase-like quantities w.r.t. to a reference antenna.
+                    y_axis = values[0, :, antenna, :, 0] - values[0, :, refantenna, :, 0]
+                    if self.wrapphase:
+                        y_axis = wrap_phase(y_axis)
+                else:
+                    y_axis = values[0, :, antenna, :, 0]
+                for i,y in enumerate(y_axis):
+                    ax.plot(x_axis, y[:,i])
+            elif 'pol' in self.stcache.axes:
+                if st_type == 'phase':
+                    ax.set_ylim(-np.pi, np.pi)
+                    # Plot phase-like quantities w.r.t. to a reference antenna.
+                    y_axis = values[0, :, antenna, :] - values[0, :, refantenna, :]
+                    if self.wrapphase:
+                        y_axis = wrap_phase(y_axis)
+                else:
+                    y_axis = values[0, :, antenna, :]
+                for i in range(y_axis.shape[1]):
+                    ax.plot(x_axis, y_axis[:, i], 'h', label=self.stcache.values[1]['pol'][i])
+            elif 'dir' in self.stcache.axes:
+                if st_type == 'phase':
+                    ax.set_ylim(-np.pi, np.pi)
+                    # Plot phase-like quantities w.r.t. to a reference antenna.
+                    y_axis = values[0, :, antenna, 0] - values[0, :, refantenna, 0]
+                    if self.wrapphase:
+                        y_axis = wrap_phase(y_axis)
+                else:
+                    y_axis = values[0, :, antenna, 0]
 
-        # Common rotation angle has no polarization axis, so needs to be treated a bit differently.
-        if ('rotation' in self.soltab.name) and ('dir' in self.soltab.getValues()[1].keys()):
-            # LoSoTo 1.0 order
-            if self.axis == 'time':
-                y_axis = values[0, antenna, 0, :]
-            elif self.axis == 'freq':
-                y_axis = values[0, antenna, :, 0]
-            ax.plot(x_axis, y_axis, 'h')
-        elif 'phase' in self.soltab.name:
-            print('Phase wrapping: ' + str(self.wrapphase))
-            if ('dir' in self.soltab.getValues()[1].keys()) and (
-                    list(self.soltab.getValues()[1].keys())[-1] == 'time'):
-                print('dir keyword found')
-                # LoSoTo < 2.0 order; pick the 0th direction.
-                if self.axis == 'time':
-                    if self.wrapphase:
-                        y_axis = [wrap_phase(values[pol, 0, antenna, 0, :] - values[pol, 0, refantenna, 0, :]) for pol in range(values.shape[0])]
-                    else:
-                        y_axis = [(values[pol, 0, antenna, 0, :] - values[pol, 0, refantenna, 0, :]) for pol in range(values.shape[0])]
-                elif self.axis == 'freq':
-                    if self.wrapphase:
-                        y_axis = [wrap_phase(values[pol, 0, antenna, :, 0] - values[pol, 0, refantenna, :, 0]) for pol in range(values.shape[0])]
-                    else:
-                        y_axis = [(values[pol, 0, antenna, :, 0] - values[pol, 0, refantenna, :, 0]) for pol in range(values.shape[0])]
-            elif ('dir' in self.soltab.getValues()[1].keys()) and (
-                    list(self.soltab.getValues()[1].keys())[0] == 'time'):
-                # LoSoTo 2.0 order.
-                pass
-            elif ('dir' not in self.soltab.getValues()[1].keys()) and (
-                    list(self.soltab.getValues()[1].keys())[-1] == 'time'):
-                # LoSoTo < 2.0 order.
-                pass
-            elif ('dir' not in self.soltab.getValues()[1].keys()) and (
-                    list(self.soltab.getValues()[1].keys())[0] == 'time'):
-                # LoSoTo 2.0 order.
-                if self.axis == 'time':
-                    if self.wrapphase:
-                        y_axis = [wrap_phase(values[:, 0, antenna, pol] - values[:, 0, refantenna, pol]) for pol in range(values.shape[-1])]
-                    else:
-                        y_axis = [(values[:, 0, antenna, pol] - values[:, 0, refantenna, pol]) for pol in range(values.shape[-1])]
-                elif self.axis == 'freq':
-                    if self.wrapphase:
-                        y_axis = [wrap_phase(values[0, :, antenna, pol] - values[0, :, refantenna, pol]) for pol in range(values.shape[-1])]
-                    else:
-                        y_axis = [(values[0, :, antenna, pol] - values[0, :, refantenna, pol]) for pol in range(values.shape[-1])]
-
-            for i, y in enumerate(y_axis):
-                ax.plot(x_axis, y, 'h', label=self.soltab.getValues()[1]['pol'][i])
-            ax.legend()
-        else:
-            if ('dir' in self.soltab.getValues()[1].keys()) and (list(self.soltab.getValues()[1].keys())[-1] == 'time'):
-                # LoSoTo < 2.0 order; pick the 0th direction.
-                if self.axis == 'time':
-                    y_axis = [values[pol, 0, antenna, 0, :] for pol in range(values.shape[0])]
-                elif self.axis == 'freq':
-                    y_axis = [values[pol, 0, antenna, :, 0] for pol in range(values.shape[0])]
-            elif ('dir' in self.soltab.getValues()[1].keys()) and (list(self.soltab.getValues()[1].keys())[0] == 'time'):
-                # LoSoTo 2.0 order.
-                pass
-            elif ('dir' not in self.soltab.getValues()[1].keys()) and (list(self.soltab.getValues()[1].keys())[-1] == 'time'):
-                # LoSoTo < 2.0 order.
-                pass
-            elif ('dir' not in self.soltab.getValues()[1].keys()) and (list(self.soltab.getValues()[1].keys())[0] == 'time'):
-                # LoSoTo 2.0 order.
-                if self.axis == 'time':
-                    y_axis = [values[:, 0, antenna, pol] for pol in range(values.shape[-1])]
-                elif self.axis == 'freq':
-                    y_axis = [values[0, :, antenna, pol] for pol in range(values.shape[-1])]
-
-            for i, y in enumerate(y_axis):
-                ax.plot(x_axis, y, 'h', label=self.soltab.getValues()[1]['pol'][i])
-            ax.legend()
         ax.set(xlabel=self.axis, ylabel=labels[1], xlim=limits[0], ylim=limits[1])
+        ax.legend()
         self.figures.append(fig)
         fig.show()
+
+class SoltabCache:
+    '''Simple class just to store temporarily reordered soltab data.'''
+    def __init__(self, values, axes):
+        self.values = values
+        self.axes = axes
+
+    def update(self, nvalues, naxes):
+        self.values = nvalues
+        self.axes = naxes
+
+def reorder_soltab(st):
+    logging.info('Reordering soltab.')
+    order_old = st.getAxesNames()
+    order_new = ['time', 'freq', 'ant']
+    print(order_old)
+    if 'pol' in order_old:
+        order_new += ['pol']
+    if 'dir' in order_old:
+        order_new += ['dir']
+    reordered = reorderAxes(st.getValues()[0], order_old, order_new)
+    st_new = (reordered, st.getValues()[1])
+    return st_new, order_new
 
 def wrap_phase(phase):
     wphase = (phase + np.pi) % (2 * np.pi) - np.pi
