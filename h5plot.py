@@ -302,8 +302,7 @@ if __name__ == '__main__':
         print('SolTabs in ' + solset + ':')
         ss = H5FILE.getSolset(solset)
         soltabs = ss.getSoltabNames()
-        print('\t', end='')
-        print(', '.join(soltabs))
+        print('\t'+', '.join(soltabs))
 
     # Initialize the GUI.
     APP = QApplication(sys.argv)
