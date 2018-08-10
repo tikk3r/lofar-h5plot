@@ -41,6 +41,8 @@ class H5PlotGUI(QDialog):
         self.wrapphase = True
 
         self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames())
+        rvals, raxes = reorder_soltab(self.soltab)
+        self.stcache.update(rvals, raxes)
 
         self.move(300, 300)
         self.setWindowTitle('H5Plot')
@@ -150,7 +152,11 @@ class H5PlotGUI(QDialog):
         refantenna = self.refant_picker.currentIndex()
         # Values have shape (timestamps, frequencies, antennas, polarizations, directions).
         values = self.stcache.values[0]
-        x_axis = self.stcache.values[1][self.axis]
+        if ('rotationmeasure' in self.soltab.name) and (self.axis == 'freq'):
+            self.logger.warning('Rotation Measure does not support frequency axis! Switch to time instead.')
+            return
+        else:
+            x_axis = self.stcache.values[1][self.axis]
         st_type = self.soltab.getType()
 
         fig = plt.figure()
@@ -158,11 +164,14 @@ class H5PlotGUI(QDialog):
         ax.set_title(self.stations[antenna])
 
         if self.axis == 'time':
+            if 'rotationmeasure' in self.soltab.name:
+                y_axis = values[:, antenna]
+                ax.plot(x_axis, y_axis)
             if ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[:, 0, antenna, :, 0] - values[0, :, refantenna, :, 0]
+                    y_axis = values[:, 0, antenna, :, 0] - values[:, 0, refantenna, :, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
@@ -173,7 +182,7 @@ class H5PlotGUI(QDialog):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[:, 0, antenna, :] - values[0, :, refantenna, :]
+                    y_axis = values[:, 0, antenna, :] - values[:, 0, refantenna, :]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
@@ -184,12 +193,14 @@ class H5PlotGUI(QDialog):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[:, 0, antenna, 0] - values[0, :, refantenna, 0]
+                    y_axis = values[:, 0, antenna, 0] - values[:, 0, refantenna, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
                     y_axis = values[:, 0, antenna, 0]
         elif self.axis == 'freq':
+            if 'rotationmeasure' in self.soltab.name:
+                self.logger.warning('Rotation Measure does not support frequency axis! Switch to time instead.')
             if ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
@@ -223,7 +234,8 @@ class H5PlotGUI(QDialog):
                     y_axis = values[0, :, antenna, 0]
 
         ax.set(xlabel=self.axis, ylabel=labels[1], xlim=limits[0], ylim=limits[1])
-        ax.legend()
+        if ax.get_legend_handles_labels()[1]:
+            ax.legend()
         self.figures.append(fig)
         fig.show()
 
@@ -238,10 +250,12 @@ class SoltabCache:
         self.axes = naxes
 
 def reorder_soltab(st):
-    logging.info('Reordering soltab.')
+    logging.info('Reordering soltab '+st.name)
     order_old = st.getAxesNames()
-    order_new = ['time', 'freq', 'ant']
-    print(order_old)
+    if 'rotationmeasure' in st.name:
+        order_new = ['time', 'ant']
+    else:
+        order_new = ['time', 'freq', 'ant']
     if 'pol' in order_old:
         order_new += ['pol']
     if 'dir' in order_old:
