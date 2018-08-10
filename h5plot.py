@@ -41,6 +41,7 @@ class H5PlotGUI(QDialog):
         self.wrapphase = True
 
         self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames())
+        reorder_soltab(self.soltab)
 
         self.move(300, 300)
         self.setWindowTitle('H5Plot')
@@ -162,7 +163,7 @@ class H5PlotGUI(QDialog):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[:, 0, antenna, :, 0] - values[0, :, refantenna, :, 0]
+                    y_axis = values[:, 0, antenna, :, 0] - values[:, 0, refantenna, :, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
@@ -173,7 +174,7 @@ class H5PlotGUI(QDialog):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[:, 0, antenna, :] - values[0, :, refantenna, :]
+                    y_axis = values[:, 0, antenna, :] - values[:, 0, refantenna, :]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
@@ -184,7 +185,7 @@ class H5PlotGUI(QDialog):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[:, 0, antenna, 0] - values[0, :, refantenna, 0]
+                    y_axis = values[:, 0, antenna, 0] - values[:, 0, refantenna, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
