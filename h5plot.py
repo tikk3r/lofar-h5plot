@@ -121,6 +121,11 @@ class H5PlotGUI(QDialog):
         """
         self.logger.debug('Solset changed to: ' + self.solset_picker.currentText())
         self.solset = self.h5parm.getSolset(self.solset_picker.currentText())
+        self.soltab_labels = self.solset.getSoltabNames()
+        self.soltab_picker.clear()
+        for l in self.soltab_labels:
+            self.soltab_picker.addItem(l)
+        self._soltab_picker_event()
 
     def _soltab_picker_event(self):
         """Callback function for when the SolTab is changed.
@@ -152,12 +157,13 @@ class H5PlotGUI(QDialog):
         refantenna = self.refant_picker.currentIndex()
         # Values have shape (timestamps, frequencies, antennas, polarizations, directions).
         values = self.stcache.values[0]
-        if ('rotationmeasure' in self.soltab.name) and (self.axis == 'freq'):
+        if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name)) and (self.axis == 'freq'):
             self.logger.warning('Rotation Measure does not support frequency axis! Switch to time instead.')
             return
         else:
             x_axis = self.stcache.values[1][self.axis]
         st_type = self.soltab.getType()
+        print(st_type)
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -174,6 +180,8 @@ class H5PlotGUI(QDialog):
                     y_axis = values[:, 0, antenna, :, 0] - values[:, 0, refantenna, :, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
+                elif (st_type == 'clock') or (st_type == 'rotationmeasure'):
+                    y_axis = values[:, antenna]
                 else:
                     y_axis = values[:, 0, antenna, :, 0]
                 for i,y in enumerate(y_axis):
@@ -185,6 +193,8 @@ class H5PlotGUI(QDialog):
                     y_axis = values[:, 0, antenna, :] - values[:, 0, refantenna, :]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
+                elif (st_type == 'clock') or (st_type == 'rotationmeasure'):
+                    y_axis = values[:, antenna]
                 else:
                     y_axis = values[:, 0, antenna, :]
                 for i in range(y_axis.shape[1]):
@@ -196,14 +206,19 @@ class H5PlotGUI(QDialog):
                     y_axis = values[:, 0, antenna, 0] - values[:, 0, refantenna, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
+                elif (st_type == 'clock') or (st_type == 'rotationmeasure'):
+                    y_axis = values[:, antenna]
                 else:
                     y_axis = values[:, 0, antenna, 0]
                 ax.plot(x_axis, y_axis[:, i], 'h')
             elif ('pol' not in self.stcache.axes) and ('dir' not in self.stcache.axes):
-                y_axis = values[:, 0, antenna]
+                if (st_type == 'clock') or (st_type == 'rotationmeasure'):
+                    y_axis = values[:, antenna]
+                else:
+                    y_axis = values[:, 0, antenna]
                 ax.plot(x_axis, y_axis)
         elif self.axis == 'freq':
-            if 'rotationmeasure' in self.soltab.name:
+            if ('rotationmeasure' in self.soltab.name) or ('clock' in self.soltab.name):
                 self.logger.warning('Rotation Measure does not support frequency axis! Switch to time instead.')
             if ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
                 if st_type == 'phase':
@@ -259,7 +274,7 @@ class SoltabCache:
 def reorder_soltab(st):
     logging.info('Reordering soltab '+st.name)
     order_old = st.getAxesNames()
-    if 'rotationmeasure' in st.name:
+    if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name):
         order_new = ['time', 'ant']
     else:
         order_new = ['time', 'freq', 'ant']
