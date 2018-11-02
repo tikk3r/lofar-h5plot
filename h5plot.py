@@ -184,8 +184,8 @@ class H5PlotGUI(QDialog):
                     y_axis = values[:, antenna]
                 else:
                     y_axis = values[:, 0, antenna, :, 0]
-                for i,y in enumerate(y_axis):
-                    ax.plot(x_axis, y[:,i], 'h', label=self.stcache.values[1]['pol'][i])
+                for i in range(y_axis.shape[1]):
+                    ax.plot(x_axis, y_axis[:,i], 'h', label=self.stcache.values[1]['pol'][i])
             elif 'pol' in self.stcache.axes:
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
@@ -229,8 +229,8 @@ class H5PlotGUI(QDialog):
                         y_axis = wrap_phase(y_axis)
                 else:
                     y_axis = values[0, :, antenna, :, 0]
-                for i,y in enumerate(y_axis):
-                    ax.plot(x_axis, y[:,i])
+                for i in range(y_axis.shape[1]):
+                    ax.plot(x_axis, y_axis[:,i])
             elif 'pol' in self.stcache.axes:
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
