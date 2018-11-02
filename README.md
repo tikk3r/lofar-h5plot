@@ -6,7 +6,7 @@ Inspect an H5Parm with
 
     python h5plot.py <h5parm>
 
-This tool is mainly developed in Python 3.6.4, but as of https://github.com/tikk3r/lofar-h5plot/commit/31d05e091c6bfe97eb2a0cf61c9ef02e99942ff0, it should work in Python 2 as well (tested with 2.7.14).
+This tool is mainly developed in Python 3.6.4, as it uses PyQt5 at the moment, but a Python 2 version is being worked on.
 # Requirements
 * Python >= 3.6.4
 * LoSoTo 2.0
