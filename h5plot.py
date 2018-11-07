@@ -134,6 +134,13 @@ class H5PlotGUI(QDialog):
         """
         self.logger.debug('Soltab changed to: ' + self.soltab_picker.currentText())
         self.soltab = self.solset.getSoltab(self.soltab_picker.currentText())
+        stations_old = self.stations
+        self.stations = self.soltab.getValues()[1]['ant']
+        if not np.array_equiv(stations_old, self.stations):
+            self.logger.debug('Number of stations changed, updating list.')
+            # The list of stations has changed, update the list.
+            self.station_picker.clear()
+            self.station_picker.addItems(self.stations)
         rvals, raxes = reorder_soltab(self.soltab)
         self.stcache.update(rvals, raxes)
 
