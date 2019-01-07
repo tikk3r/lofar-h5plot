@@ -31,7 +31,7 @@ class H5PlotGUI(QDialog):
 
         self.h5parm = lh5.h5parm(h5file)
         self.solset_labels = self.h5parm.getSolsetNames()
-        self.solset = self.h5parm.getSolset('sol000')
+        self.solset = self.h5parm.getSolset(self.solset_labels[0])
 
         self.soltab_labels = self.solset.getSoltabNames()
         self.soltab = self.solset.getSoltab(self.soltab_labels[0])
