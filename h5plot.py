@@ -26,7 +26,7 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 class GraphWindow(QDialog):
     """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
     """
-    def __init__(self, xaxis, yaxis, frametitle, limits=[None,None], labels=['',''], parent=None):
+    def __init__(self, xaxis, yaxis, frametitle, limits=[None,None], labels=['',''], plot_labels=[], parent=None):
         super(GraphWindow, self).__init__(parent)
         # Set up for logging output.
         self.LOGGER = logging.getLogger('H5plot_logger')
@@ -41,10 +41,10 @@ class GraphWindow(QDialog):
         
         self.setWindowTitle(frametitle)
 
-        self.button_next = QPushButton('Next')
+        self.button_next = QPushButton('Forward')
         self.select_label = QLabel('test')
         self.select_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.button_prev = QPushButton('Previous')
+        self.button_prev = QPushButton('Back')
 
         buttons = QGridLayout()
         buttons.addWidget(self.button_prev, 0, 0)
@@ -65,21 +65,29 @@ class GraphWindow(QDialog):
         layout.addRow(buttons)
         self.setLayout(layout)
         
+        self.plot(xaxis, yaxis, frametitle, limits=[None, None], labels=[labels[0], labels[1]], plot_labels=plot_labels)
 
+    def _forward_button_event(self):
+        pass
+
+    def plot(self, xaxis, yaxis, frametitle='', limits=[None, None], labels=['', ''], plot_labels=[]):
         ax = self.fig.add_subplot(111)
         ax.set_title(frametitle)
         if ax.get_legend_handles_labels()[1]:
             ax.legend()
         if type(yaxis) is list:
             yaxis = np.asarray(yaxis)
-        if len(yaxis.shape) > 1:
+        if len(yaxis.shape) > 1 and len(plot_labels) != 0:
+            for i in range(yaxis.shape[0]):
+                ax.plot(xaxis, yaxis[i, :], label=plot_labels[i])
+            ax.legend()
+        elif len(yaxis.shape) > 1 and len(plot_labels) == 0:
             for i in range(yaxis.shape[0]):
                 ax.plot(xaxis, yaxis[i, :])
         else:
             ax.plot(xaxis, yaxis)
         ax.set(xlabel=labels[0], ylabel=labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
-        #self.figures.append(fig)
         
     
 
@@ -172,6 +180,8 @@ class H5PlotGUI(QDialog):
     def closeEvent(self, event):
         self.logger.info('Closing all open figures before exiting.')
         plt.close('all' )
+        for f in self.figures:
+            f.close()
         event.accept()
 
     def _refant_picker_event(self):
@@ -270,9 +280,11 @@ class H5PlotGUI(QDialog):
                 else:
                     y_axis = values[:, 0, antenna, :]
                 Y_AXIS = []
+                plabels = []
                 for i in range(y_axis.shape[1]):
                     #ax.plot(x_axis, y_axis[:, i], 'h', label=self.stcache.values[1]['pol'][i])
                     Y_AXIS.append(y_axis[:, i])
+                    plabels.append(self.stcache.values[1]['pol'][i])
             elif 'dir' in self.stcache.axes:
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
@@ -305,9 +317,10 @@ class H5PlotGUI(QDialog):
                         y_axis = wrap_phase(y_axis)
                 else:
                     y_axis = values[0, :, antenna, :, 0]
+                Y_AXIS = []
                 for i in range(y_axis.shape[1]):
                     #ax.plot(x_axis, y_axis[:,i])
-                    pass
+                    Y_AXIS.append(y_axis[:, i])
             elif 'pol' in self.stcache.axes:
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
@@ -317,28 +330,32 @@ class H5PlotGUI(QDialog):
                         y_axis = wrap_phase(y_axis)
                 else:
                     y_axis = values[0, :, antenna, :]
+                Y_AXIS = []
+                plabels=[]
                 for i in range(y_axis.shape[1]):
                     #ax.plot(x_axis, y_axis[:, i], 'h', label=self.stcache.values[1]['pol'][i])
-                    pass
+                    Y_AXIS.append(y_axis[:, i])
+                    plabels.append(self.stcache.values[1]['pol'][i])
             elif 'dir' in self.stcache.axes:
                 if st_type == 'phase':
-                    ax.set_ylim(-np.pi, np.pi)
+                    #ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
                     y_axis = values[0, :, antenna, 0] - values[0, :, refantenna, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
                     y_axis = values[0, :, antenna, 0]
+                Y_AXIS = y_axis
             elif ('pol' not in self.stcache.axes) and ('dir' not in self.stcache.axes):
                 y_axis = values[0, :, antenna]
+                Y_AXIS = y_axis
                 #ax.plot(x_axis, y_axis)
 
-        #ax.set(xlabel=self.axis, ylabel=labels[1], xlim=limits[0], ylim=limits[1])
-        #if ax.get_legend_handles_labels()[1]:
-        #    ax.legend()
-        #self.figures.append(fig)
-        #fig.show()
-        plot_window = GraphWindow(x_axis, Y_AXIS, self.stations[antenna], labels=[self.axis, labels[1]])
+        if 'pol' in self.stcache.axes:
+            plot_window = GraphWindow(x_axis, Y_AXIS, self.stations[antenna], labels=[self.axis, labels[1]], plot_labels=plabels)
+        else:
+            plot_window = GraphWindow(x_axis, Y_AXIS, self.stations[antenna], labels=[self.axis, labels[1]])
+        self.figures.append(plot_window)
         plot_window.show()
 
 class SoltabCache:
