@@ -1,4 +1,3 @@
-[![Build Status](https://travis-ci.org/tikk3r/lofar-h5plot.svg?branch=master)](https://travis-ci.org/tikk3r/lofar-h5plot)
 ![pylint Score](https://mperlet.github.io/pybadge/badges/7.29.svg)
 
 # lofar-h5plot
