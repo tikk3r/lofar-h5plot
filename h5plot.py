@@ -49,14 +49,26 @@ class GraphWindow(QDialog):
 
         self.button_next = QPushButton('Forward')
         self.button_next.clicked.connect(self._forward_button_event)
-        if 'time' in axis.lower():
-            self.select_label = QLabel('Freq slot {:.2f} MHz'.format(self.parent.frequencies[freqslot] / 1e6))
-        elif 'freq' in axis.lower():
-            self.select_label = QLabel('Time: ' + self.format_time(timeslot))
-        self.select_label.setAlignment(QtCore.Qt.AlignCenter)
         self.button_prev = QPushButton('Back')
         self.button_prev.clicked.connect(self._backward_button_event)
         self.button_prev.setEnabled(False)
+        if 'time' in axis.lower():
+            try:
+                self.select_label = QLabel('Freq slot {:.2f} MHz'.format(self.parent.frequencies[freqslot] / 1e6))
+            except:
+                # No frequency axis.
+                self.select_label = QLabel('')
+                self.button_next.setEnabled(False)
+                self.button_prev.setEnabled(False)
+        elif 'freq' in axis.lower():
+            try:
+                self.select_label = QLabel('Time: ' + self.format_time(timeslot))
+            except:
+                # No time axis.
+                self.select_label = QLabel('')
+                self.button_next.setEnabled(False)
+                self.button_prev.setEnabled(False)
+        self.select_label.setAlignment(QtCore.Qt.AlignCenter)
 
         buttons = QGridLayout()
         buttons.addWidget(self.button_prev, 0, 0)
@@ -80,18 +92,16 @@ class GraphWindow(QDialog):
         #self.plot(xaxis, yax, frametitle, limits=[None, None], labels=[labels[0], labels[1]], plot_labels=plot_labels)
 
     def format_time(self, seconds):
-        print(seconds)
         if seconds < 60:
             return '{:.3f} sec'.format(seconds)
-        elif 60 < seconds < 3600:
+        elif 60 <= seconds < 3600:
             return '{:.3f} min'.format(seconds / 60)
-        elif seconds > 3600:
+        elif seconds >= 3600:
             return '{:.3f} hr'.format(seconds / 3600)
         else:
             return '{:.3f}'.format(seconds)
 
     def _forward_button_event(self):
-        self.LOGGER.debug('Going forward!')
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.parent.frequencies[self.freqslot] / 1e6))
@@ -112,7 +122,6 @@ class GraphWindow(QDialog):
         self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
     def _backward_button_event(self):
-        self.LOGGER.debug('Going backward!')
         if 'time' in self.xlabel.lower():
             if self.freqslot > 0:
                 self.freqslot -= 1
@@ -141,6 +150,9 @@ class GraphWindow(QDialog):
         self.ylabelp = plot_labels[1]
         ax = self.fig.add_subplot(111)
         ax.clear()
+        if 'time' in ax_labels[0]:
+            # Start counting from t=0
+            xaxis = xaxis - xaxis[0]
         ax.set_title(frametitle)
         if ax.get_legend_handles_labels()[1]:
             ax.legend()
@@ -435,6 +447,8 @@ class H5PlotGUI(QDialog):
             elif ('pol' not in self.stcache.axes) and ('dir' not in self.stcache.axes):
                 y_axis = values[timeslot, :, antenna]
                 Y_AXIS = y_axis
+        if len(plabels) == 0:
+            plabels = ['', '']
         return x_axis, Y_AXIS, plabels, isphase
     
     def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
