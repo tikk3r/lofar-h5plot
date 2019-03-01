@@ -26,12 +26,18 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 class GraphWindow(QDialog):
     """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
     """
-    def __init__(self, frametitle, parent=None):
+    def __init__(self, frametitle, antindex, axis, timeslot=0, freqslot=0, parent=None):
         super(GraphWindow, self).__init__(parent)
         # Set up for logging output.
-        self.LOGGER = logging.getLogger('H5plot_logger')
+        self.LOGGER = logging.getLogger('GraphWindow')
         #LOGGER.setLevel(logging.INFO)
         self.LOGGER.setLevel(logging.DEBUG)
+
+        self.frametitle = frametitle
+        self.axis = axis
+        self.timeslot = 0
+        self.freqslot = 0
+        self.parent = parent
 
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.LOGFILEH = logging.FileHandler('h5plot.log')
@@ -42,9 +48,15 @@ class GraphWindow(QDialog):
         self.setWindowTitle(frametitle)
 
         self.button_next = QPushButton('Forward')
-        self.select_label = QLabel('test')
+        self.button_next.clicked.connect(self._forward_button_event)
+        if 'time' in axis.lower():
+            self.select_label = QLabel('Freq slot {:.2f} MHz'.format(self.parent.frequencies[freqslot] / 1e6))
+        elif 'freq' in axis.lower():
+            self.select_label = QLabel('Time slot {}'.format(timeslot))
         self.select_label.setAlignment(QtCore.Qt.AlignCenter)
         self.button_prev = QPushButton('Back')
+        self.button_prev.clicked.connect(self._backward_button_event)
+        self.button_prev.setEnabled(False)
 
         buttons = QGridLayout()
         buttons.addWidget(self.button_prev, 0, 0)
@@ -68,13 +80,44 @@ class GraphWindow(QDialog):
         #self.plot(xaxis, yax, frametitle, limits=[None, None], labels=[labels[0], labels[1]], plot_labels=plot_labels)
 
     def _forward_button_event(self):
-        pass
+        self.LOGGER.debug('Going forward!')
+        if 'time' in self.xlabel.lower():
+            self.freqslot += 1
+            self.select_label.setText('Freq slot {:.2f} MHz'.format(self.parent.frequencies[self.freqslot] / 1e6))
+            x, y, l = self.parent.load_axes(freqslot = self.freqslot)
+            if self.freqslot > 0:
+                self.button_prev.setEnabled(True)
+        elif 'freq' in self.xlabel.lower():
+            self.timeslot += 1
+            self.select_label.setText('Time slot {}'.format(self.timeslot))
+            x, y, l = self.parent.load_axes(timeslot = self.timeslot)
+        self.fig.clf()
+        self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l)
 
     def _backward_button_event(self):
-        pass
+        self.LOGGER.debug('Going backward!')
+        if 'time' in self.xlabel.lower():
+            if self.freqslot > 0:
+                self.freqslot -= 1
+                self.select_label.setText('Freq slot {:.2f} MHz'.format(self.parent.frequencies[self.freqslot] / 1e6))
+                x, y, l = self.parent.load_axes(freqslot = self.freqslot)
+                if self.freqslot == 0:
+                    print('Disabling backwards button!')
+                    self.button_prev.setEnabled(False)
+        elif 'freq' in self.xlabel.lower():
+            self.timeslot -= 1
+            x, y, l = self.parent.load_axes(timeslot = self.timeslot)
+        self.fig.clf()
+        self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l)
 
-    def plot(self, xaxis, yaxis, frametitle='', limits=[None, None], labels=['', ''], plot_labels=[], multidim=False):
+    def plot(self, xaxis, yaxis, frametitle='', limits=[None, None], ax_labels=['', ''], plot_labels=[], multidim=False, dim=0):
+        self.dim = dim
+        self.xlabel = ax_labels[0]
+        self.ylabel = ax_labels[1]
+        self.xlabelp = plot_labels[0]
+        self.ylabelp = plot_labels[1]
         ax = self.fig.add_subplot(111)
+        ax.clear()
         ax.set_title(frametitle)
         if ax.get_legend_handles_labels()[1]:
             ax.legend()
@@ -89,7 +132,7 @@ class GraphWindow(QDialog):
                 ax.plot(xaxis, yaxis[i, :], 'h--')
         else:
             ax.plot(xaxis, yaxis, 'h--')
-        ax.set(xlabel=labels[0], ylabel=labels[1], xlim=limits[0], ylim=limits[1])
+        ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
         
     
@@ -110,7 +153,13 @@ class H5PlotGUI(QDialog):
 
         self.soltab_labels = self.solset.getSoltabNames()
         self.soltab = self.solset.getSoltab(self.soltab_labels[0])
-
+        
+        for l in self.soltab_labels:
+            try:
+                self.frequencies = self.solset.getSoltab(l).getAxisValues('freq')
+                break
+            except e:
+                pass
         self.stations = self.soltab.getValues()[1]['ant']
         self.refant = 'CS001HBA0'
         self.wrapphase = True
@@ -233,10 +282,9 @@ class H5PlotGUI(QDialog):
         self.logger.debug('Plotting button pressed.')
         self.plot(labels=(self.axis, self.soltab.name))
 
-    def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
-        self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
-                         ' for ' + self.solset.name)
-        antenna = self.station_picker.currentRow()
+    def load_axes(self, timeslot=0, freqslot=0, antenna=None):
+        if not antenna:
+            antenna = self.station_picker.currentRow()
         refantenna = self.refant_picker.currentIndex()
         # Values have shape (timestamps, frequencies, antennas, polarizations, directions).
         values = self.stcache.values[0]
@@ -246,22 +294,23 @@ class H5PlotGUI(QDialog):
         else:
             x_axis = self.stcache.values[1][self.axis]
         st_type = self.soltab.getType()
-
+        plabels=[]
+        
         if self.axis == 'time':
             if 'rotationmeasure' in self.soltab.name:
                 y_axis = values[:, antenna]
-                #ax.plot(x_axis, y_axis)
+                Y_AXIS = y_axis
             elif ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
                 if st_type == 'phase':
                     #ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[:, 0, antenna, :, 0] - values[:, 0, refantenna, :, 0]
+                    y_axis = values[:, freqslot, antenna, :, 0] - values[:, freqslot, refantenna, :, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 elif (st_type == 'clock') or (st_type == 'rotationmeasure'):
                     y_axis = values[:, antenna]
                 else:
-                    y_axis = values[:, 0, antenna, :, 0]
+                    y_axis = values[:, freqslot, antenna, :, 0]
                 Y_AXIS = []
                 plabels = []
                 # Iterate over polarizations.
@@ -273,13 +322,13 @@ class H5PlotGUI(QDialog):
                 if st_type == 'phase':
                     #ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[:, 0, antenna, :] - values[:, 0, refantenna, :]
+                    y_axis = values[:, freqslot, antenna, :] - values[:, freqslot, refantenna, :]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 elif (st_type == 'clock') or (st_type == 'rotationmeasure'):
                     y_axis = values[:, antenna]
                 else:
-                    y_axis = values[:, 0, antenna, :]
+                    y_axis = values[:, freqslot, antenna, :]
                 Y_AXIS = []
                 plabels = []
                 for i in range(y_axis.shape[1]):
@@ -290,20 +339,20 @@ class H5PlotGUI(QDialog):
                 if st_type == 'phase':
                     #ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[:, 0, antenna, 0] - values[:, 0, refantenna, 0]
+                    y_axis = values[:, freqslot, antenna, 0] - values[:, freqslot, refantenna, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 elif (st_type == 'clock') or (st_type == 'rotationmeasure'):
                     y_axis = values[:, antenna]
                 else:
-                    y_axis = values[:, 0, antenna, 0]
+                    y_axis = values[:, freqslot, antenna, 0]
                 #ax.plot(x_axis, y_axis[:, i], 'h')
                 Y_AXIS = y_axis[:, i]
             elif ('pol' not in self.stcache.axes) and ('dir' not in self.stcache.axes):
                 if (st_type == 'clock') or (st_type == 'rotationmeasure'):
                     y_axis = values[:, antenna]
                 else:
-                    y_axis = values[:, 0, antenna]
+                    y_axis = values[:, freqslot, antenna]
                 #ax.plot(x_axis, y_axis)
                 Y_AXIS = y_axis
         elif self.axis == 'freq':
@@ -313,11 +362,11 @@ class H5PlotGUI(QDialog):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[0, :, antenna, :, 0] - values[0, :, refantenna, :, 0]
+                    y_axis = values[timeslot, :, antenna, :, 0] - values[timeslot, :, refantenna, :, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
-                    y_axis = values[0, :, antenna, :, 0]
+                    y_axis = values[timeslot, :, antenna, :, 0]
                 Y_AXIS = []
                 for i in range(y_axis.shape[1]):
                     #ax.plot(x_axis, y_axis[:,i])
@@ -326,11 +375,11 @@ class H5PlotGUI(QDialog):
                 if st_type == 'phase':
                     ax.set_ylim(-np.pi, np.pi)
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[0, :, antenna, :] - values[0, :, refantenna, :]
+                    y_axis = values[timeslot, :, antenna, :] - values[timeslot, :, refantenna, :]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
-                    y_axis = values[0, :, antenna, :]
+                    y_axis = values[timeslot, :, antenna, :]
                 Y_AXIS = []
                 plabels=[]
                 for i in range(y_axis.shape[1]):
@@ -339,22 +388,28 @@ class H5PlotGUI(QDialog):
             elif 'dir' in self.stcache.axes:
                 if st_type == 'phase':
                     # Plot phase-like quantities w.r.t. to a reference antenna.
-                    y_axis = values[0, :, antenna, 0] - values[0, :, refantenna, 0]
+                    y_axis = values[timeslot, :, antenna, 0] - values[timeslot, :, refantenna, 0]
                     if self.wrapphase:
                         y_axis = wrap_phase(y_axis)
                 else:
-                    y_axis = values[0, :, antenna, 0]
+                    y_axis = values[timeslot, :, antenna, 0]
                 Y_AXIS = y_axis
             elif ('pol' not in self.stcache.axes) and ('dir' not in self.stcache.axes):
-                y_axis = values[0, :, antenna]
+                y_axis = values[timeslot, :, antenna]
                 Y_AXIS = y_axis
-
+        return x_axis, Y_AXIS, plabels
+    
+    def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
+        self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
+                         ' for ' + self.solset.name)
+        antenna = self.station_picker.currentRow()
+        x_axis, Y_AXIS, plabels = self.load_axes(antenna = antenna)
         if 'pol' in self.stcache.axes:
-            plot_window = GraphWindow(self.stations[antenna])
+            plot_window = GraphWindow(self.stations[antenna], antenna, self.axis, parent=self)
         else:
-            plot_window = GraphWindow(self.stations[antenna])
+            plot_window = GraphWindow(self.stations[antenna], antenna, self.axis, parent=self)
         self.figures.append(plot_window)
-        plot_window.plot(x_axis, Y_AXIS, self.stations[antenna], limits=[None, None], labels=[self.axis, labels[1]], plot_labels=plabels)
+        plot_window.plot(x_axis, Y_AXIS, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels)
         plot_window.show()
 
 class SoltabCache:
