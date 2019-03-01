@@ -189,13 +189,16 @@ class GraphWindow(QDialog):
             yaxis = np.asarray(yaxis)
         if len(yaxis.shape) > 1 and len(plot_labels) != 0:
             for i in range(yaxis.shape[0]):
-                ax.plot(xaxis, yaxis[i, :], 'h--', label=plot_labels[i])
+                ax.plot(xaxis, yaxis[i, :], '--', alpha=0.25, color='C'+str(i))
+                ax.plot(xaxis, yaxis[i, :], 'h', label=plot_labels[i], color='C'+str(i))
             ax.legend()
         elif len(yaxis.shape) > 1 and len(plot_labels) == 0:
             for i in range(yaxis.shape[0]):
-                ax.plot(xaxis, yaxis[i, :], 'h--')
+                ax.plot(xaxis, yaxis[i, :], '--', alpha=0.25, color='C'+str(i))
+                ax.plot(xaxis, yaxis[i, :], 'h', color='C'+str(i))
         else:
-            ax.plot(xaxis, yaxis, 'h--')
+            ax.plot(xaxis, yaxis, '--', alpha=0.25, color='C0')
+            ax.plot(xaxis, yaxis, 'h', color='C0')
         if isphase:
             ax.set_ylim(-np.pi, np.pi)
         ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
@@ -378,9 +381,19 @@ class H5PlotGUI(QDialog):
     def load_axes(self, timeslot=0, freqslot=0, antenna=None):
         """ Load an abscissa and ordinate from the H5Parm.
         
-        timeslot (int): timeslot to load.
-        freqslot (int): frequency slot to load.
-        antenna (str): name of the antenna to select. Automatically determined if set to `None`.
+        Args:
+            timeslot (int): timeslot to load.
+            freqslot (int): frequency slot to load.
+            antenna (str): name of the antenna to select. Automatically determined if set to `None`.
+        Returns:
+            xaxis (ndarray): an absicssa to plot.
+            yaxis (ndarray): an ordinate to plot.
+            plabels (list): a list of labels for each plot (e.g. different polarizations).
+            isphase (bool): boolean indicating whether or not the quantity is a phase.
+
+            OR
+    
+            errorcode (str): an error message if things went wrong.
         """
         if not antenna:
             antenna = self.station_picker.currentRow()
@@ -389,7 +402,7 @@ class H5PlotGUI(QDialog):
         values = self.stcache.values[0]
         if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name)) and (self.axis == 'freq'):
             self.logger.warning('Rotation Measure does not support frequency axis! Switch to time instead.')
-            return
+            return 'Rotation Measure does not support frequency axis! Switch to time instead.'
         else:
             x_axis = self.stcache.values[1][self.axis]
         st_type = self.soltab.getType()
@@ -506,7 +519,12 @@ class H5PlotGUI(QDialog):
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
                          ' for ' + self.solset.name)
         antenna = self.station_picker.currentRow()
-        x_axis, Y_AXIS, plabels, isphase = self.load_axes(antenna = antenna)
+        msg = self.load_axes(antenna = antenna)
+        try:
+            x_axis, Y_AXIS, plabels, isphase = msg
+        except ValueError:
+            # Requested combination not supported.
+            return
         if 'pol' in self.stcache.axes:
             plot_window = GraphWindow(self.stations[antenna], antenna, self.axis, parent=self)
         else:
