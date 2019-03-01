@@ -27,6 +27,18 @@ class GraphWindow(QDialog):
     """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
     """
     def __init__(self, frametitle, antindex, axis, timeslot=0, freqslot=0, parent=None):
+        """ Initialize a new GraphWindow instance.
+        
+        Args:
+            frametitle (str): title the frame will hvae.
+            antindex (int): the index of the selected antenna.
+            axis (str): the type of axis being plotted (time or freq).
+            timeslot (int): index along the time axis to start with.
+            freqslot (int): index along the frequency axis to start with.
+            parent (QDialog): parent window instance.
+        Returns:
+            None
+        """
         super(GraphWindow, self).__init__(parent)
         # Set up for logging output.
         self.LOGGER = logging.getLogger('GraphWindow')
@@ -92,6 +104,15 @@ class GraphWindow(QDialog):
         #self.plot(xaxis, yax, frametitle, limits=[None, None], labels=[labels[0], labels[1]], plot_labels=plot_labels)
 
     def format_time(self, seconds):
+        """ Formats the time to be displayed in the plotting windows.
+        
+        A string is formatted, displaying the time in seconds or (fractional) minutes or hours.
+
+        Args:
+            seconds (int): the time in seconds.
+        Returns:
+            formatted time (str): formatted time string.
+        """
         if seconds < 60:
             return '{:.3f} sec'.format(seconds)
         elif 60 <= seconds < 3600:
@@ -102,6 +123,10 @@ class GraphWindow(QDialog):
             return '{:.3f}'.format(seconds)
 
     def _forward_button_event(self):
+        """ An event triggered by pressing the "Forward" button of a GraphWindow.
+
+        When pressed, the abscissa is advanced one position, showing the next time or frequency slot.
+        """
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.parent.frequencies[self.freqslot] / 1e6))
@@ -122,6 +147,10 @@ class GraphWindow(QDialog):
         self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
     def _backward_button_event(self):
+        """ An event triggered by pressing the "Back" button of a GraphWindow.
+
+        When pressed, the abscissa is set back one position, showing the previous time or frequency slot.
+        """
         if 'time' in self.xlabel.lower():
             if self.freqslot > 0:
                 self.freqslot -= 1
@@ -180,6 +209,14 @@ class H5PlotGUI(QDialog):
     From here the SolSets, SolTabs and antennas to plot are selected.
     """
     def __init__(self, h5file, logging_instance, parent=None):
+        """ Initialize a new instances of the H5PlotGUI.
+
+        Args:
+            h5file (str): name of the H5Parm to open.
+            logging_instance (logging): an instance of the logging module to log to.
+        Returns:
+            None
+        """
         super(H5PlotGUI, self).__init__(parent)
         self.logger = logging_instance
         self.figures = []
@@ -273,6 +310,8 @@ class H5PlotGUI(QDialog):
         self.axis = self.axis_picker.currentText()
 
     def closeEvent(self, event):
+        """ The event triggerd upon closing the main application window.
+        """
         self.logger.info('Closing all open figures before exiting.')
         plt.close('all' )
         for f in self.figures:
@@ -280,6 +319,10 @@ class H5PlotGUI(QDialog):
         event.accept()
 
     def _refant_picker_event(self):
+        """ An even triggered when a new reference antenna is selected.
+
+        Sets the `refant` attribute.
+        """
         self.logger.debug('Reference antenna changed to: ' + self.refant_picker.currentText())
         self.refant = self.refant_picker.currentText()
 
@@ -319,6 +362,8 @@ class H5PlotGUI(QDialog):
         self.stcache.update(rvals, raxes)
 
     def _phasewrap_event(self):
+        """ An even triggered upon switching phase wrapping on or off. (not yet implemented)
+        """
         self.logger.debug('Phase wrapping changed to ' + str(self.phasewrap_box.isChecked()))
         self.wrapphase = self.phasewrap_box.isChecked()
 
@@ -331,6 +376,12 @@ class H5PlotGUI(QDialog):
         self.plot(labels=(self.axis, self.soltab.name))
 
     def load_axes(self, timeslot=0, freqslot=0, antenna=None):
+        """ Load an abscissa and ordinate from the H5Parm.
+        
+        timeslot (int): timeslot to load.
+        freqslot (int): frequency slot to load.
+        antenna (str): name of the antenna to select. Automatically determined if set to `None`.
+        """
         if not antenna:
             antenna = self.station_picker.currentRow()
         refantenna = self.refant_picker.currentIndex()
@@ -467,15 +518,41 @@ class H5PlotGUI(QDialog):
 class SoltabCache:
     '''Simple class just to store temporarily reordered soltab data.'''
     def __init__(self, values, axes):
+        """ Initialize a new SoltabCache instance.
+        
+        Args:
+            values (ndarray): values to cache.
+            axes (ndarray): axes to store.
+        Returns:
+            None
+        """
         self.values = values
         self.axes = axes
 
     def update(self, nvalues, naxes):
+        """ Update the data in the cache.
+    
+        Args:
+            nvalues (ndarray): new values to store in the cache.
+            naxes (ndarray): new axes to store in the cache.
+        Returns:
+            None
+        """
         self.values = nvalues
         self.axes = naxes
 
 # Global helper functions.
 def reorder_soltab(st):
+    """ Reorder a soltab in the order H5plot expects.
+
+    The expected order in the plotter is time, frequency, antenna, polarization, direction.
+
+    Args:
+        st (SolTab): soltab instance to reorder the axes of.
+    Returns:
+        st_new (SolTab): soltab reodered to the expected order.
+        order_new (ndarray): array containing the reordered order of the axes.
+    """
     logging.info('Reordering soltab '+st.name)
     order_old = st.getAxesNames()
     if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name):
@@ -496,6 +573,15 @@ def reorder_soltab(st):
     return st_new, order_new
 
 def wrap_phase(phase):
+    """ Map phases to the range -pi, pi.
+
+    The formula (phase + np.pi) % (2 * np.pi) - np.pi is used to map phases into a plottable range.
+
+    Args:
+        phase (ndarray): narray of phases to remap.
+    Returns:
+        wphase (ndarray): narray of remapped phases.
+    """
     wphase = (phase + np.pi) % (2 * np.pi) - np.pi
     return wphase
 
