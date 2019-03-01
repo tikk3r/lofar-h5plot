@@ -52,7 +52,7 @@ class GraphWindow(QDialog):
         if 'time' in axis.lower():
             self.select_label = QLabel('Freq slot {:.2f} MHz'.format(self.parent.frequencies[freqslot] / 1e6))
         elif 'freq' in axis.lower():
-            self.select_label = QLabel('Time slot {}'.format(timeslot))
+            self.select_label = QLabel('Time: ' + self.format_time(timeslot))
         self.select_label.setAlignment(QtCore.Qt.AlignCenter)
         self.button_prev = QPushButton('Back')
         self.button_prev.clicked.connect(self._backward_button_event)
@@ -79,20 +79,35 @@ class GraphWindow(QDialog):
         
         #self.plot(xaxis, yax, frametitle, limits=[None, None], labels=[labels[0], labels[1]], plot_labels=plot_labels)
 
+    def format_time(self, seconds):
+        print(seconds)
+        if seconds < 60:
+            return '{:.3f} sec'.format(seconds)
+        elif 60 < seconds < 3600:
+            return '{:.3f} min'.format(seconds / 60)
+        elif seconds > 3600:
+            return '{:.3f} hr'.format(seconds / 3600)
+        else:
+            return '{:.3f}'.format(seconds)
+
     def _forward_button_event(self):
         self.LOGGER.debug('Going forward!')
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.parent.frequencies[self.freqslot] / 1e6))
             x, y, l, p = self.parent.load_axes(freqslot = self.freqslot)
-            if self.freqslot > 0:
+            if (self.freqslot > 0) and (not self.button_prev.isEnabled()):
                 self.button_prev.setEnabled(True)
             if self.freqslot == (len(self.parent.frequencies) - 1):
                 self.button_next.setEnabled(False)
         elif 'freq' in self.xlabel.lower():
             self.timeslot += 1
-            self.select_label.setText('Time slot {}'.format(self.timeslot))
+            self.select_label.setText('Time: ' + self.format_time(self.timeslot))
             x, y, l, p = self.parent.load_axes(timeslot = self.timeslot)
+            if self.timeslot < (len(self.parent.times) - 1) and (not self.button_prev.isEnabled()):
+                self.button_prev.setEnabled(True)
+            if self.timeslot == (len(self.parent.times) - 1):
+                self.button_next.setEnabled(False)
         self.fig.clf()
         self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
@@ -108,11 +123,14 @@ class GraphWindow(QDialog):
                 if (self.freqslot < (len(self.parent.frequencies)-1)) and (not self.button_next.isEnabled()):
                     self.button_next.setEnabled(True)
         elif 'freq' in self.xlabel.lower():
-            if self.freqslot > 0:
+            if self.timeslot > 0:
                 self.timeslot -= 1
+                self.select_label.setText('Time: ' + self.format_time(self.timeslot))
                 x, y, l, p = self.parent.load_axes(timeslot = self.timeslot)
                 if self.timeslot == 0:
                     self.button_prev.setEnabled(False)
+                if (self.timeslot < (len(self.parent.times)-1)) and (not self.button_next.isEnabled()):
+                    self.button_next.setEnabled(True)
         self.fig.clf()
         self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
@@ -164,6 +182,12 @@ class H5PlotGUI(QDialog):
         for l in self.soltab_labels:
             try:
                 self.frequencies = self.solset.getSoltab(l).getAxisValues('freq')
+                break
+            except e:
+                pass
+        for l in self.soltab_labels:
+            try:
+                self.times = self.solset.getSoltab(l).getAxisValues('time')
                 break
             except e:
                 pass
