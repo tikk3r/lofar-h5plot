@@ -83,35 +83,40 @@ class GraphWindow(QDialog):
         self.LOGGER.debug('Going forward!')
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
-            self.select_label.setText('Freq slot {:.2f} MHz'.format(self.parent.frequencies[self.freqslot] / 1e6))
-            x, y, l = self.parent.load_axes(freqslot = self.freqslot)
+            self.select_label.setText('Frequency: {:.3f} MHz'.format(self.parent.frequencies[self.freqslot] / 1e6))
+            x, y, l, p = self.parent.load_axes(freqslot = self.freqslot)
             if self.freqslot > 0:
                 self.button_prev.setEnabled(True)
+            if self.freqslot == (len(self.parent.frequencies) - 1):
+                self.button_next.setEnabled(False)
         elif 'freq' in self.xlabel.lower():
             self.timeslot += 1
             self.select_label.setText('Time slot {}'.format(self.timeslot))
-            x, y, l = self.parent.load_axes(timeslot = self.timeslot)
+            x, y, l, p = self.parent.load_axes(timeslot = self.timeslot)
         self.fig.clf()
-        self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l)
+        self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
     def _backward_button_event(self):
         self.LOGGER.debug('Going backward!')
         if 'time' in self.xlabel.lower():
             if self.freqslot > 0:
                 self.freqslot -= 1
-                self.select_label.setText('Freq slot {:.2f} MHz'.format(self.parent.frequencies[self.freqslot] / 1e6))
-                x, y, l = self.parent.load_axes(freqslot = self.freqslot)
+                self.select_label.setText('Frequency: {:.3f} MHz'.format(self.parent.frequencies[self.freqslot] / 1e6))
+                x, y, l, p = self.parent.load_axes(freqslot = self.freqslot)
                 if self.freqslot == 0:
-                    print('Disabling backwards button!')
                     self.button_prev.setEnabled(False)
+                if (self.freqslot < (len(self.parent.frequencies)-1)) and (not self.button_next.isEnabled()):
+                    self.button_next.setEnabled(True)
         elif 'freq' in self.xlabel.lower():
-            self.timeslot -= 1
-            x, y, l = self.parent.load_axes(timeslot = self.timeslot)
+            if self.freqslot > 0:
+                self.timeslot -= 1
+                x, y, l, p = self.parent.load_axes(timeslot = self.timeslot)
+                if self.timeslot == 0:
+                    self.button_prev.setEnabled(False)
         self.fig.clf()
-        self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l)
+        self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
-    def plot(self, xaxis, yaxis, frametitle='', limits=[None, None], ax_labels=['', ''], plot_labels=[], multidim=False, dim=0):
-        self.dim = dim
+    def plot(self, xaxis, yaxis, frametitle='', limits=[None, None], ax_labels=['', ''], plot_labels=[], multidim=False, isphase=False):
         self.xlabel = ax_labels[0]
         self.ylabel = ax_labels[1]
         self.xlabelp = plot_labels[0]
@@ -132,6 +137,8 @@ class GraphWindow(QDialog):
                 ax.plot(xaxis, yaxis[i, :], 'h--')
         else:
             ax.plot(xaxis, yaxis, 'h--')
+        if isphase:
+            ax.set_ylim(-np.pi, np.pi)
         ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
         
@@ -267,6 +274,11 @@ class H5PlotGUI(QDialog):
             # The list of stations has changed, update the list.
             self.station_picker.clear()
             self.station_picker.addItems(self.stations)
+        try:
+            self.frequencies = self.soltab.getAxisValues('freq')
+        except:
+            # Soltab probably has no frequency axis.
+            pass
         rvals, raxes = reorder_soltab(self.soltab)
         self.stcache.update(rvals, raxes)
 
@@ -295,6 +307,7 @@ class H5PlotGUI(QDialog):
             x_axis = self.stcache.values[1][self.axis]
         st_type = self.soltab.getType()
         plabels=[]
+        isphase = False
         
         if self.axis == 'time':
             if 'rotationmeasure' in self.soltab.name:
@@ -302,7 +315,7 @@ class H5PlotGUI(QDialog):
                 Y_AXIS = y_axis
             elif ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
                 if st_type == 'phase':
-                    #ax.set_ylim(-np.pi, np.pi)
+                    isphase = True
                     # Plot phase-like quantities w.r.t. to a reference antenna.
                     y_axis = values[:, freqslot, antenna, :, 0] - values[:, freqslot, refantenna, :, 0]
                     if self.wrapphase:
@@ -320,7 +333,7 @@ class H5PlotGUI(QDialog):
                     plabels.append(self.stcache.values[1]['pol'][i])
             elif 'pol' in self.stcache.axes:
                 if st_type == 'phase':
-                    #ax.set_ylim(-np.pi, np.pi)
+                    isphase = True
                     # Plot phase-like quantities w.r.t. to a reference antenna.
                     y_axis = values[:, freqslot, antenna, :] - values[:, freqslot, refantenna, :]
                     if self.wrapphase:
@@ -337,7 +350,7 @@ class H5PlotGUI(QDialog):
                     plabels.append(self.stcache.values[1]['pol'][i])
             elif 'dir' in self.stcache.axes:
                 if st_type == 'phase':
-                    #ax.set_ylim(-np.pi, np.pi)
+                    isphase = True
                     # Plot phase-like quantities w.r.t. to a reference antenna.
                     y_axis = values[:, freqslot, antenna, 0] - values[:, freqslot, refantenna, 0]
                     if self.wrapphase:
@@ -360,7 +373,7 @@ class H5PlotGUI(QDialog):
                 self.logger.warning('Rotation Measure does not support frequency axis! Switch to time instead.')
             if ('pol' in self.stcache.axes) and ('dir' in self.stcache.axes):
                 if st_type == 'phase':
-                    ax.set_ylim(-np.pi, np.pi)
+                    isphase = True
                     # Plot phase-like quantities w.r.t. to a reference antenna.
                     y_axis = values[timeslot, :, antenna, :, 0] - values[timeslot, :, refantenna, :, 0]
                     if self.wrapphase:
@@ -373,7 +386,7 @@ class H5PlotGUI(QDialog):
                     Y_AXIS.append(y_axis[:, i])
             elif 'pol' in self.stcache.axes:
                 if st_type == 'phase':
-                    ax.set_ylim(-np.pi, np.pi)
+                    isphase = True
                     # Plot phase-like quantities w.r.t. to a reference antenna.
                     y_axis = values[timeslot, :, antenna, :] - values[timeslot, :, refantenna, :]
                     if self.wrapphase:
@@ -387,6 +400,7 @@ class H5PlotGUI(QDialog):
                     plabels.append(self.stcache.values[1]['pol'][i])
             elif 'dir' in self.stcache.axes:
                 if st_type == 'phase':
+                    isphase = True
                     # Plot phase-like quantities w.r.t. to a reference antenna.
                     y_axis = values[timeslot, :, antenna, 0] - values[timeslot, :, refantenna, 0]
                     if self.wrapphase:
@@ -397,19 +411,19 @@ class H5PlotGUI(QDialog):
             elif ('pol' not in self.stcache.axes) and ('dir' not in self.stcache.axes):
                 y_axis = values[timeslot, :, antenna]
                 Y_AXIS = y_axis
-        return x_axis, Y_AXIS, plabels
+        return x_axis, Y_AXIS, plabels, isphase
     
     def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
                          ' for ' + self.solset.name)
         antenna = self.station_picker.currentRow()
-        x_axis, Y_AXIS, plabels = self.load_axes(antenna = antenna)
+        x_axis, Y_AXIS, plabels, isphase = self.load_axes(antenna = antenna)
         if 'pol' in self.stcache.axes:
             plot_window = GraphWindow(self.stations[antenna], antenna, self.axis, parent=self)
         else:
             plot_window = GraphWindow(self.stations[antenna], antenna, self.axis, parent=self)
         self.figures.append(plot_window)
-        plot_window.plot(x_axis, Y_AXIS, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels)
+        plot_window.plot(x_axis, Y_AXIS, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
 
 class SoltabCache:
