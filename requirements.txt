@@ -1,0 +1,4 @@
+pyqt5
+matplotlib
+numpy
+-e https://github.com/revoltek/losoto/archive/master.zip
