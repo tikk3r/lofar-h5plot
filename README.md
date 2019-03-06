@@ -13,7 +13,8 @@ This tool is mainly developed in Python 3.6.4, as it uses PyQt5 at the moment, b
 * Numpy
 * PyQt5
 
-These can be installed through
+These can be installed on Ubuntu through
 
+    apt-get install qt5-default libgl1-mesa-glx
     pip install pyqt5 matplotlib
     pip install --upgrade https://github.com/revoltek/losoto/archive/master.zip
