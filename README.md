@@ -1,5 +1,7 @@
 [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/2492)
 ![pylint Score](https://mperlet.github.io/pybadge/badges/7.29.svg)
+<img alt="GitHub" src="https://img.shields.io/github/license/tikk3r/lofar-h5plot.svg">
+<img alt="Requires.io" src="https://img.shields.io/requires/github/tikk3r/lofar-h5plot.svg">
 
 **Download from Singularity-hub:** `singularity pull --name h5plot.simg shub://tikk3r/lofar-h5plot`
 
