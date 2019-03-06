@@ -54,7 +54,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0):
     isphase = False
     
     if axis_type == 'time':
-        if 'rotationmeasure' in st.name:
+        if ('rotationmeasure' in st.name) or ('faraday' in st.name):
             y_axis = values[:, antenna]
             Y_AXIS = y_axis
         elif ('pol' in axes) and ('dir' in axes):
@@ -109,7 +109,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0):
                 y_axis = values[:, freqslot, antenna]
             Y_AXIS = y_axis
     elif axis_type == 'freq':
-        if ('rotationmeasure' in st.name) or ('clock' in st.name):
+        if ('rotationmeasure' in st.name) or ('clock' in st.name) or ('faraday' in st.name):
             logging.warning('Rotation Measure does not support frequency axis! Switch to time instead.')
         if ('pol' in axes) and ('dir' in axes):
             if st_type == 'phase':
@@ -532,8 +532,7 @@ class H5PlotGUI(QDialog):
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
                          ' for ' + self.solset.name)
         antenna = self.station_picker.currentRow()
-        if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name)) and (self.axis == 'freq'):
-            #self.logger.warning('Rotation Measure or clock does not support frequency axis! Switch to time instead.')
+        if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name) or ('faraday' in self.soltab.name) and (self.axis == 'freq'):
             self.logger.info('Rotation Measure or clock does not support frequency axis! Switch to time instead.')
             return
         msg = load_axes(self.stcache.values, self.soltab, self.axis, antenna = antenna, refantenna = int(np.argwhere(self.stations==self.refant)))
@@ -591,7 +590,7 @@ def reorder_soltab(st):
     """
     logging.info('Reordering soltab '+st.name)
     order_old = st.getAxesNames()
-    if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name):
+    if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name):
         order_new = ['time', 'ant']
     else:
         order_new = ['time', 'freq', 'ant']
