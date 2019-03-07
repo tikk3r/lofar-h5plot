@@ -54,7 +54,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0):
     isphase = False
     
     if axis_type == 'time':
-        if ('rotationmeasure' in st.name) or ('faraday' in st.name):
+        if ('rotationmeasure' in st.name) or ('faraday' in st.name) or ('tec' in st.name):
             y_axis = values[:, antenna]
             Y_AXIS = y_axis
         elif ('pol' in axes) and ('dir' in axes):
@@ -64,7 +64,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0):
                 y_axis = values[:, freqslot, antenna, :, 0] - values[:, freqslot, refantenna, :, 0]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
-            elif (st_type == 'clock') or (st_type == 'rotationmeasure'):
+            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec'):
                 y_axis = values[:, antenna]
             else:
                 y_axis = values[:, freqslot, antenna, :, 0]
@@ -81,7 +81,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0):
                 y_axis = values[:, freqslot, antenna, :] - values[:, freqslot, refantenna, :]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
-            elif (st_type == 'clock') or (st_type == 'rotationmeasure'):
+            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec'):
                 y_axis = values[:, antenna]
             else:
                 y_axis = values[:, freqslot, antenna, :]
@@ -97,19 +97,19 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0):
                 y_axis = values[:, freqslot, antenna, 0] - values[:, freqslot, refantenna, 0]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
-            elif (st_type == 'clock') or (st_type == 'rotationmeasure'):
+            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec'):
                 y_axis = values[:, antenna]
             else:
                 y_axis = values[:, freqslot, antenna, 0]
             Y_AXIS = y_axis[:, i]
         elif ('pol' not in axes) and ('dir' not in axes):
-            if (st_type == 'clock') or (st_type == 'rotationmeasure'):
+            if (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec'):
                 y_axis = values[:, antenna]
             else:
                 y_axis = values[:, freqslot, antenna]
             Y_AXIS = y_axis
     elif axis_type == 'freq':
-        if ('rotationmeasure' in st.name) or ('clock' in st.name) or ('faraday' in st.name):
+        if ('rotationmeasure' in st.name) or ('clock' in st.name) or ('faraday' in st.name) or ('tec' in st.name):
             logging.warning('Rotation Measure does not support frequency axis! Switch to time instead.')
         if ('pol' in axes) and ('dir' in axes):
             if st_type == 'phase':
@@ -532,7 +532,7 @@ class H5PlotGUI(QDialog):
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
                          ' for ' + self.solset.name)
         antenna = self.station_picker.currentRow()
-        if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name) or ('faraday' in self.soltab.name)) and (self.axis == 'freq'):
+        if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name) or ('faraday' in self.soltab.name) or ('tec' in self.soltab.name)) and (self.axis == 'freq'):
             self.logger.info('Rotation Measure or clock does not support frequency axis! Switch to time instead.')
             return
         msg = load_axes(self.stcache.values, self.soltab, self.axis, antenna = antenna, refantenna = int(np.argwhere(self.stations==self.refant)))
@@ -542,10 +542,6 @@ class H5PlotGUI(QDialog):
             # Requested combination not supported.
             return
         plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations==self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self)
-        #if 'pol' in self.stcache.axes:
-        #    plot_window = GraphWindow(self.stations[antenna], antenna, self.axis, times=self.times, freqs=self.frequencies, parent=self)
-        #else:
-        #    plot_window = GraphWindow(self.stations[antenna], antenna, self.axis, parent=self)
         self.figures.append(plot_window)
         plot_window.plot(x_axis, Y_AXIS, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
@@ -590,7 +586,7 @@ def reorder_soltab(st):
     """
     logging.info('Reordering soltab '+st.name)
     order_old = st.getAxesNames()
-    if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name):
+    if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name) or ('tec' in st.name):
         order_new = ['time', 'ant']
     else:
         order_new = ['time', 'freq', 'ant']

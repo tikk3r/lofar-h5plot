@@ -1,4 +1,4 @@
 PyQt5==5.12
-matplotlib==3.0.2
+matplotlib>=3.0.2
 numpy>=1.14.5
 -e git+https://github.com/revoltek/losoto#egg=losoto
