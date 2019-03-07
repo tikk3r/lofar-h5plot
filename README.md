@@ -3,7 +3,7 @@
 <img alt="GitHub" src="https://img.shields.io/github/license/tikk3r/lofar-h5plot.svg">
 <img alt="Requires.io" src="https://img.shields.io/requires/github/tikk3r/lofar-h5plot.svg">
 
-**Download from Singularity-hub:** `singularity pull --name h5plot.simg shub://tikk3r/lofar-h5plot`
+**Download the latest commit from Singularity-hub:** `singularity pull --name h5plot.simg shub://tikk3r/lofar-h5plot`
 
 # LOFAR H5plot
 H5plot is a small GUI to view the solutions in an H5parm interactively. To run it directly, clone this repository and run as
