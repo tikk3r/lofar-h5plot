@@ -5,8 +5,8 @@
 <img alt="GitHub" src="https://img.shields.io/github/license/tikk3r/lofar-h5plot.svg">
 <img alt="Requires.io" src="https://img.shields.io/requires/github/tikk3r/lofar-h5plot.svg">
 </p>
-<h2 align="center">Download the latest commit from Singularity-hub:</h2>
 <p align="center">
+    <b>Download the latest commit from Singularity-hub:</b><br/>
 <tt>singularity pull --name h5plot.simg shub://tikk3r/lofar-h5plot</tt><br/>
 The image is always the latest commit on the master branch, no guarantees on stability.
 </p>
