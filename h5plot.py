@@ -121,8 +121,10 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0):
             else:
                 y_axis = values[timeslot, :, antenna, :, 0]
             Y_AXIS = []
+            plabels=[]
             for i in range(y_axis.shape[1]):
                 Y_AXIS.append(y_axis[:, i])
+                plabels.append(vals[1]['pol'][i])
         elif 'pol' in axes:
             if st_type == 'phase':
                 isphase = True
