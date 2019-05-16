@@ -1,11 +1,18 @@
-[![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/2492)
-![pylint Score](https://mperlet.github.io/pybadge/badges/7.29.svg)
+<h1 align="center">LOFAR H5plot</h1>
+<p align="center">
+<img alt="Singularity-Hub" src="https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg" href="https://singularity-hub.org/collections/2492">
+<img alt="Pylint" src="https://mperlet.github.io/pybadge/badges/7.29.svg">
 <img alt="GitHub" src="https://img.shields.io/github/license/tikk3r/lofar-h5plot.svg">
 <img alt="Requires.io" src="https://img.shields.io/requires/github/tikk3r/lofar-h5plot.svg">
+</p>
+<p align="center">
+    <b>Download the latest commit from Singularity-hub:</b><br/>
+<tt>singularity pull --name h5plot.simg shub://tikk3r/lofar-h5plot</tt><br/>
+The image is always the latest commit on the master branch, no guarantees on stability.
+</p>
 
-**Download from Singularity-hub:** `singularity pull --name h5plot.simg shub://tikk3r/lofar-h5plot`
+---
 
-# LOFAR H5plot
 H5plot is a small GUI to view the solutions in an H5parm interactively. To run it directly, clone this repository and run as
 
     python h5plot.py <h5parm>
