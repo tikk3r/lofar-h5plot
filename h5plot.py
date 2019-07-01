@@ -507,6 +507,8 @@ class H5PlotGUI(QDialog):
             # The list of stations has changed, update the list.
             self.station_picker.clear()
             self.station_picker.addItems(self.stations)
+            self.refant_picker.clear()
+            self.refant_picker.addItems(self.stations)
         try:
             self.frequencies = self.soltab.getAxisValues('freq')
         except:
