@@ -101,7 +101,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0):
                 y_axis = values[:, antenna]
             else:
                 y_axis = values[:, freqslot, antenna, 0]
-            Y_AXIS = y_axis[:, i]
+            Y_AXIS = y_axis
         elif ('pol' not in axes) and ('dir' not in axes):
             if (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec'):
                 y_axis = values[:, antenna]
