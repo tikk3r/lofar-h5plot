@@ -395,7 +395,7 @@ class H5PlotGUI(QDialog):
             except e:
                 pass
         self.stations = self.soltab.getValues()[1]['ant']
-        self.refant = 'CS001HBA0'
+        self.refant = self.stations[0]
         self.wrapphase = True
 
         self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames())
