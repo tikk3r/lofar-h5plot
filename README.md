@@ -21,6 +21,8 @@ or, when using the Singularity image,
 
     singularity run h5plot.simg <h5parm>
 
+![Screenshot](screen.png?raw=true)
+
 # Requirements
 * Python >= 3.6.4
 * LoSoTo 2.0
