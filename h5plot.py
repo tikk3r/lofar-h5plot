@@ -221,7 +221,7 @@ class GraphWindow(QDialog):
         if 'time' in axis.lower():
             try:
                 self.select_label = QLabel('Freq slot {:.2f} MHz'.format(self.frequencies[freqslot] / 1e6))
-            except NameError:
+            except TypeError:
                 # No frequency axis.
                 self.select_label = QLabel('')
                 self.button_next.setEnabled(False)
@@ -229,7 +229,7 @@ class GraphWindow(QDialog):
         elif 'freq' in axis.lower():
             try:
                 self.select_label = QLabel('Time: ' + self.format_time(timeslot))
-            except NameError:
+            except TypeError:
                 # No time axis.
                 self.select_label = QLabel('')
                 self.button_next.setEnabled(False)
@@ -385,13 +385,13 @@ class H5PlotGUI(QDialog):
             try:
                 self.frequencies = self.solset.getSoltab(l).getAxisValues('freq')
                 break
-            except NameError:
+            except TypeError:
                 pass
         for l in self.soltab_labels:
             try:
                 self.times = self.solset.getSoltab(l).getAxisValues('time')
                 break
-            except NameError:
+            except TypeError:
                 pass
         self.stations = self.soltab.getValues()[1]['ant']
         self.directions = [s.decode('utf-8') for s in self.solset.getSou().keys()]
@@ -516,7 +516,7 @@ class H5PlotGUI(QDialog):
             self.refant_picker.addItems(self.stations)
         try:
             self.frequencies = self.soltab.getAxisValues('freq')
-        except NameError:
+        except TypeError:
             # Soltab probably has no frequency axis.
             pass
         rvals, raxes = reorder_soltab(self.soltab)
