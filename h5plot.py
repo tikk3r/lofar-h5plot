@@ -5,8 +5,8 @@ import logging
 import signal
 import sys
 
-from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QLabel, \
-    QListWidget, QMainWindow, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QLabel, \
+    QListWidget, QPushButton, QVBoxLayout
 from PyQt5 import QtCore
 
 from losoto.lib_operations import reorderAxes
@@ -16,16 +16,17 @@ from matplotlib.figure import Figure
 
 import losoto.h5parm as lh5
 import matplotlib
-matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import numpy as np
+matplotlib.use('Qt5Agg')
 plt.ion()
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+
 def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, direction=0):
     """ Load an abscissa and ordinate from the H5Parm.
-    
+
     Args:
         vals (ndarray): raw soltab values to load.
         st_type (str): string describing the type of solutions (e.g. phase, clock, amplitude).
@@ -51,7 +52,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
     st_type = st.getType()
     x_axis = vals[1][axis_type]
     values = vals[0]
-    plabels=[]
+    plabels = []
     isphase = False
 
     if axis_type == 'time':
@@ -73,7 +74,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
             plabels = []
             # Iterate over polarizations.
             for i in range(y_axis.shape[1]):
-                Y_AXIS.append(y_axis[:,i])
+                Y_AXIS.append(y_axis[:, i])
                 plabels.append(vals[1]['pol'][i])
         elif 'pol' in axes:
             if st_type == 'phase':
@@ -98,7 +99,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 y_axis = values[:, freqslot, antenna, direction] - values[:, freqslot, refantenna, direction]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
-            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and not 'freq' in axes):
+            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and 'freq' not in axes):
                 y_axis = values[:, antenna, direction]
             else:
                 y_axis = values[:, freqslot, antenna, direction]
@@ -122,7 +123,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
             else:
                 y_axis = values[timeslot, :, antenna, :, 0]
             Y_AXIS = []
-            plabels=[]
+            plabels = []
             for i in range(y_axis.shape[1]):
                 Y_AXIS.append(y_axis[:, i])
                 plabels.append(vals[1]['pol'][i])
@@ -136,7 +137,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
             else:
                 y_axis = values[timeslot, :, antenna, :]
             Y_AXIS = []
-            plabels=[]
+            plabels = []
             for i in range(y_axis.shape[1]):
                 Y_AXIS.append(y_axis[:, i])
                 plabels.append(vals[1]['pol'][i])
@@ -157,12 +158,13 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
         plabels = ['', '', '', '']
     return x_axis, Y_AXIS, plabels, isphase
 
+
 class GraphWindow(QDialog):
     """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
     """
     def __init__(self, values, frametitle, antindex, refantindex, axis, st, timeslot=0, freqslot=0, direction=0, times=None, freqs=None, parent=None):
         """ Initialize a new GraphWindow instance.
-        
+
         Args:
             frametitle (str): title the frame will hvae.
             antindex (int): the index of the selected antenna.
@@ -174,11 +176,10 @@ class GraphWindow(QDialog):
         Returns:
             None
         """
-        #super(GraphWindow, self).__init__(parent)
         super(GraphWindow, self).__init__()
         # Set up for logging output.
         self.LOGGER = logging.getLogger('GraphWindow')
-        #LOGGER.setLevel(logging.INFO)
+        # LOGGER.setLevel(logging.INFO)
         self.LOGGER.setLevel(logging.DEBUG)
 
         self.frametitle = frametitle
@@ -192,14 +193,12 @@ class GraphWindow(QDialog):
         self.st = st
         self.parent = parent
         try:
-            #self.frequencies = self.parent.frequencies.copy()
             self.frequencies = freqs
         except AttributeError:
             # frequencies is None, plotting against time.
             pass
 
         try:
-            #self.times = self.parent.times.copy()
             self.times = times
             self.times -= self.times[0]
         except AttributeError:
@@ -211,7 +210,7 @@ class GraphWindow(QDialog):
         self.LOGFILEH.setLevel(logging.DEBUG)
         self.LOGFILEH.setFormatter(formatter)
         self.LOGGER.addHandler(LOGFILEH)
-        
+
         self.setWindowTitle(frametitle)
 
         self.button_next = QPushButton('Forward')
@@ -222,7 +221,7 @@ class GraphWindow(QDialog):
         if 'time' in axis.lower():
             try:
                 self.select_label = QLabel('Freq slot {:.2f} MHz'.format(self.frequencies[freqslot] / 1e6))
-            except:
+            except NameError:
                 # No frequency axis.
                 self.select_label = QLabel('')
                 self.button_next.setEnabled(False)
@@ -230,7 +229,7 @@ class GraphWindow(QDialog):
         elif 'freq' in axis.lower():
             try:
                 self.select_label = QLabel('Time: ' + self.format_time(timeslot))
-            except:
+            except NameError:
                 # No time axis.
                 self.select_label = QLabel('')
                 self.button_next.setEnabled(False)
@@ -245,7 +244,7 @@ class GraphWindow(QDialog):
         self.fig = Figure()
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
-        
+
         self.layout_plot = QVBoxLayout()
         self.layout_plot.addWidget(self.toolbar)
         self.layout_plot.addWidget(self.select_label)
@@ -255,12 +254,10 @@ class GraphWindow(QDialog):
         self.layout.addRow(self.layout_plot)
         self.layout.addRow(self.buttons)
         self.setLayout(self.layout)
-        
-        #self.plot(xaxis, yax, frametitle, limits=[None, None], labels=[labels[0], labels[1]], plot_labels=plot_labels)
 
     def format_time(self, seconds):
         """ Formats the time to be displayed in the plotting windows.
-        
+
         A string is formatted, displaying the time in seconds or (fractional) minutes or hours.
 
         Args:
@@ -285,7 +282,7 @@ class GraphWindow(QDialog):
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot = self.freqslot)
+            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot)
             if (self.freqslot > 0) and (not self.button_prev.isEnabled()):
                 self.button_prev.setEnabled(True)
             if self.freqslot == (len(self.frequencies) - 1):
@@ -293,7 +290,7 @@ class GraphWindow(QDialog):
         elif 'freq' in self.xlabel.lower():
             self.timeslot += 1
             self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
-            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot = self.timeslot)
+            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot)
             if self.timeslot < (len(self.times) - 1) and (not self.button_prev.isEnabled()):
                 self.button_prev.setEnabled(True)
             if self.timeslot == (len(self.times) - 1):
@@ -309,19 +306,19 @@ class GraphWindow(QDialog):
             if self.freqslot > 0:
                 self.freqslot -= 1
                 self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot = self.freqslot)
+                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot)
                 if self.freqslot == 0:
                     self.button_prev.setEnabled(False)
-                if (self.freqslot < (len(self.frequencies)-1)) and (not self.button_next.isEnabled()):
+                if (self.freqslot < (len(self.frequencies) - 1)) and (not self.button_next.isEnabled()):
                     self.button_next.setEnabled(True)
         elif 'freq' in self.xlabel.lower():
             if self.timeslot > 0:
                 self.timeslot -= 1
                 self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
-                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot = self.timeslot)
+                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot)
                 if self.timeslot == 0:
                     self.button_prev.setEnabled(False)
-                if (self.timeslot < (len(self.parent.times)-1)) and (not self.button_next.isEnabled()):
+                if (self.timeslot < (len(self.parent.times) - 1)) and (not self.button_next.isEnabled()):
                     self.button_next.setEnabled(True)
         self.plot(x, y, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
@@ -343,13 +340,13 @@ class GraphWindow(QDialog):
             yaxis = np.asarray(yaxis)
         if len(yaxis.shape) > 1 and len(plot_labels) != 0:
             for i in range(yaxis.shape[0]):
-                self.ax.plot(xaxis, yaxis[i, :], '--', alpha=0.25, color='C'+str(i))
-                self.ax.plot(xaxis, yaxis[i, :], 'h', label=plot_labels[i], color='C'+str(i))
+                self.ax.plot(xaxis, yaxis[i, :], '--', alpha=0.25, color='C' + str(i))
+                self.ax.plot(xaxis, yaxis[i, :], 'h', label=plot_labels[i], color='C' + str(i))
             self.ax.legend()
         elif len(yaxis.shape) > 1 and len(plot_labels) == 0:
             for i in range(yaxis.shape[0]):
-                self.ax.plot(xaxis, yaxis[i, :], '--', alpha=0.25, color='C'+str(i))
-                self.ax.plot(xaxis, yaxis[i, :], 'h', color='C'+str(i))
+                self.ax.plot(xaxis, yaxis[i, :], '--', alpha=0.25, color='C' + str(i))
+                self.ax.plot(xaxis, yaxis[i, :], 'h', color='C' + str(i))
         else:
             self.ax.plot(xaxis, yaxis, '--', alpha=0.25, color='C0')
             self.ax.plot(xaxis, yaxis, 'h', color='C0')
@@ -357,8 +354,7 @@ class GraphWindow(QDialog):
             self.ax.set_ylim(-np.pi, np.pi)
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
-        
-    
+
 
 class H5PlotGUI(QDialog):
     """The main GUI for H5Plot.
@@ -384,18 +380,18 @@ class H5PlotGUI(QDialog):
 
         self.soltab_labels = self.solset.getSoltabNames()
         self.soltab = self.solset.getSoltab(self.soltab_labels[0])
-        
+
         for l in self.soltab_labels:
             try:
                 self.frequencies = self.solset.getSoltab(l).getAxisValues('freq')
                 break
-            except e:
+            except NameError:
                 pass
         for l in self.soltab_labels:
             try:
                 self.times = self.solset.getSoltab(l).getAxisValues('time')
                 break
-            except e:
+            except NameError:
                 pass
         self.stations = self.soltab.getValues()[1]['ant']
         self.directions = [s.decode('utf-8') for s in self.solset.getSou().keys()]
@@ -432,10 +428,10 @@ class H5PlotGUI(QDialog):
         self.refant_picker.addItems(self.stations)
         self.refant_picker.activated.connect(self._refant_picker_event)
 
-        #self.phasewrap_box = QCheckBox('Wrap Phases')
-        #self.phasewrap_box.setChecked(True)
-        #self.phasewrap_box.setEnabled(False)
-        #self.phasewrap_box.stateChanged.connect(self._phasewrap_event)
+        # self.phasewrap_box = QCheckBox('Wrap Phases')
+        # self.phasewrap_box.setChecked(True)
+        # self.phasewrap_box.setEnabled(False)
+        # self.phasewrap_box.stateChanged.connect(self._phasewrap_event)
         self.dir_label = QLabel('Dir.')
         self.dir_picker = QComboBox()
         self.dir_picker.addItems(self.directions)
@@ -447,7 +443,6 @@ class H5PlotGUI(QDialog):
         self.station_picker = QListWidget()
         self.station_picker.addItems(self.stations)
         self.station_picker.setCurrentRow(0)
-
 
         plot_layout = QGridLayout()
         plot_layout.addWidget(self.soltab_label_y, 0, 0)
@@ -477,7 +472,7 @@ class H5PlotGUI(QDialog):
         """ The event triggerd upon closing the main application window.
         """
         self.logger.info('Closing all open figures before exiting.')
-        plt.close('all' )
+        plt.close('all')
         for f in self.figures:
             f.close()
         event.accept()
@@ -521,7 +516,7 @@ class H5PlotGUI(QDialog):
             self.refant_picker.addItems(self.stations)
         try:
             self.frequencies = self.soltab.getAxisValues('freq')
-        except:
+        except NameError:
             # Soltab probably has no frequency axis.
             pass
         rvals, raxes = reorder_soltab(self.soltab)
@@ -549,7 +544,6 @@ class H5PlotGUI(QDialog):
         self.logger.debug('Plotting button pressed.')
         self.plot(labels=(self.axis, self.soltab.name))
 
-    
     def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
                          ' for ' + self.solset.name)
@@ -557,26 +551,27 @@ class H5PlotGUI(QDialog):
         if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name) or ('faraday' in self.soltab.name) or ('tec' in self.soltab.name)) and (self.axis == 'freq'):
             self.logger.info('Rotation Measure or clock does not support frequency axis! Switch to time instead.')
             return
-        msg = load_axes(self.stcache.values, self.soltab, self.axis, antenna = antenna, refantenna = int(np.argwhere(self.stations==self.refant)), direction = self.direction)
+        msg = load_axes(self.stcache.values, self.soltab, self.axis, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), direction=self.direction)
         try:
             x_axis, Y_AXIS, plabels, isphase = msg
         except ValueError:
             # Requested combination not supported.
             return
         if 'freq' in self.soltab.getAxesNames():
-            plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations==self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self, direction=self.directions[self.direction])
+            plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self, direction=self.directions[self.direction])
         else:
             # Probably TEC or another solution type with no frequency axis.
-            plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations==self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction])
+            plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction])
         self.figures.append(plot_window)
         plot_window.plot(x_axis, Y_AXIS, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
+
 
 class SoltabCache:
     '''Simple class just to store temporarily reordered soltab data.'''
     def __init__(self, values, axes):
         """ Initialize a new SoltabCache instance.
-        
+
         Args:
             values (ndarray): values to cache.
             axes (ndarray): axes to store.
@@ -588,7 +583,7 @@ class SoltabCache:
 
     def update(self, nvalues, naxes):
         """ Update the data in the cache.
-    
+
         Args:
             nvalues (ndarray): new values to store in the cache.
             naxes (ndarray): new axes to store in the cache.
@@ -597,6 +592,7 @@ class SoltabCache:
         """
         self.values = nvalues
         self.axes = naxes
+
 
 # Global helper functions.
 def reorder_soltab(st):
@@ -610,7 +606,7 @@ def reorder_soltab(st):
         st_new (SolTab): soltab reodered to the expected order.
         order_new (ndarray): array containing the reordered order of the axes.
     """
-    logging.info('Reordering soltab '+st.name)
+    logging.info('Reordering soltab ' + st.name)
     order_old = st.getAxesNames()
     if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name) or ('tec' in st.name):
         order_new = ['time', 'ant']
@@ -629,6 +625,7 @@ def reorder_soltab(st):
     st_new = (reordered, st.getValues()[1])
     return st_new, order_new
 
+
 def wrap_phase(phase):
     """ Map phases to the range -pi, pi.
 
@@ -642,12 +639,13 @@ def wrap_phase(phase):
     wphase = (phase + np.pi) % (2 * np.pi) - np.pi
     return wphase
 
+
 if __name__ == '__main__':
     FILENAME = sys.argv[1]
     H5FILE = lh5.h5parm(FILENAME, readonly=True)
     # Set up for logging output.
     LOGGER = logging.getLogger('H5plot_logger')
-    #LOGGER.setLevel(logging.INFO)
+    # LOGGER.setLevel(logging.INFO)
     LOGGER.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -659,12 +657,12 @@ if __name__ == '__main__':
     LOGGER.info('Successfully opened %s', FILENAME)
 
     SOLSETS = H5FILE.getSolsetNames()
-    print('Found solset(s) '+ ', '.join(SOLSETS))
+    print('Found solset(s) ' + ', '.join(SOLSETS))
     for solset in SOLSETS:
         print('SolTabs in ' + solset + ':')
         ss = H5FILE.getSolset(solset)
         soltabs = ss.getSoltabNames()
-        print('\t'+', '.join(soltabs))
+        print('\t' + ', '.join(soltabs))
 
     # Initialize the GUI.
     APP = QApplication(sys.argv)
