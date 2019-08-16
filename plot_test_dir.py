@@ -53,9 +53,8 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
     values = vals[0]
     plabels=[]
     isphase = False
-
     if axis_type == 'time':
-        if ('rotationmeasure' in st.name) or ('faraday' in st.name) or ('tec' in st.name and 'freq' not in axes and 'dir' not in axes):
+        if ('rotationmeasure' in st.name) or ('faraday' in st.name):# or ('tec' in st.name):
             y_axis = values[:, antenna]
             Y_AXIS = y_axis
         elif ('pol' in axes) and ('dir' in axes):
@@ -65,8 +64,8 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 y_axis = values[:, freqslot, antenna, :, direction] - values[:, freqslot, refantenna, :, direction]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
-            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and 'freq' not in axes):
-                y_axis = values[:, antenna, direction]
+            elif (st_type == 'clock') or (st_type == 'rotationmeasure'):# or (st_type == 'tec'):
+                y_axis = values[:, antenna]
             else:
                 y_axis = values[:, freqslot, antenna, :, direction]
             Y_AXIS = []
@@ -93,6 +92,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 plabels.append(vals[1]['pol'][i])
         elif 'dir' in axes:
             if st_type == 'phase':
+                print('if')
                 isphase = True
                 # Plot phase-like quantities w.r.t. to a reference antenna.
                 y_axis = values[:, freqslot, antenna, direction] - values[:, freqslot, refantenna, direction]
@@ -101,6 +101,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
             elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and not 'freq' in axes):
                 y_axis = values[:, antenna, direction]
             else:
+                print('else')
                 y_axis = values[:, freqslot, antenna, direction]
             Y_AXIS = y_axis
         elif ('pol' not in axes) and ('dir' not in axes):
@@ -121,8 +122,8 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                     y_axis = wrap_phase(y_axis)
             else:
                 y_axis = values[timeslot, :, antenna, :, 0]
-            Y_AXIS = []
             plabels=[]
+            Y_AXIS = []
             for i in range(y_axis.shape[1]):
                 Y_AXIS.append(y_axis[:, i])
                 plabels.append(vals[1]['pol'][i])
@@ -169,7 +170,7 @@ class GraphWindow(QDialog):
             axis (str): the type of axis being plotted (time or freq).
             timeslot (int): index along the time axis to start with.
             freqslot (int): index along the frequency axis to start with.
-            direction (str): name of the direction to plot.
+            direction (int): index of the direction to plot.
             parent (QDialog): parent window instance.
         Returns:
             None
@@ -181,7 +182,7 @@ class GraphWindow(QDialog):
         #LOGGER.setLevel(logging.INFO)
         self.LOGGER.setLevel(logging.DEBUG)
 
-        self.frametitle = frametitle
+        self.frametitle = frametitle 
         self.axis = axis
         self.timeslot = 0
         self.freqslot = 0
@@ -196,7 +197,7 @@ class GraphWindow(QDialog):
             self.frequencies = freqs
         except AttributeError:
             # frequencies is None, plotting against time.
-            pass
+            self.frequencies = None
 
         try:
             #self.times = self.parent.times.copy()
@@ -285,7 +286,7 @@ class GraphWindow(QDialog):
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot = self.freqslot)
+            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot = self.freqslot, direction=self.direction)
             if (self.freqslot > 0) and (not self.button_prev.isEnabled()):
                 self.button_prev.setEnabled(True)
             if self.freqslot == (len(self.frequencies) - 1):
@@ -336,15 +337,18 @@ class GraphWindow(QDialog):
         if 'time' in ax_labels[0]:
             # Start counting from t=0
             xaxis = xaxis - xaxis[0]
-        self.ax.set_title(frametitle + ' - {:s}'.format(self.direction))
+        self.ax.set_title(frametitle + ' - Dir {:d}'.format(self.direction))
         if self.ax.get_legend_handles_labels()[1]:
             self.ax.legend()
         if type(yaxis) is list:
             yaxis = np.asarray(yaxis)
         if len(yaxis.shape) > 1 and len(plot_labels) != 0:
-            for i in range(yaxis.shape[0]):
-                self.ax.plot(xaxis, yaxis[i, :], '--', alpha=0.25, color='C'+str(i))
-                self.ax.plot(xaxis, yaxis[i, :], 'h', label=plot_labels[i], color='C'+str(i))
+            #for i in range(yaxis.shape[0]):
+            for i in range(1):
+                #self.ax.plot(xaxis, yaxis[i, :], '--', alpha=0.25, color='C'+str(i))
+                self.ax.plot(xaxis, yaxis[:, 0], '--', alpha=0.25, color='C'+str(0))
+                #self.ax.plot(xaxis, yaxis[i, :], 'h', label=plot_labels[i], color='C'+str(i))
+                #self.ax.plot(xaxis, yaxis[:, 0], 'h', label=plot_labels[i], color='C'+str(i))
             self.ax.legend()
         elif len(yaxis.shape) > 1 and len(plot_labels) == 0:
             for i in range(yaxis.shape[0]):
@@ -385,22 +389,22 @@ class H5PlotGUI(QDialog):
         self.soltab_labels = self.solset.getSoltabNames()
         self.soltab = self.solset.getSoltab(self.soltab_labels[0])
         
-        for l in self.soltab_labels:
-            try:
-                self.frequencies = self.solset.getSoltab(l).getAxisValues('freq')
-                break
-            except e:
-                pass
+        notime = False
         for l in self.soltab_labels:
             try:
                 self.times = self.solset.getSoltab(l).getAxisValues('time')
                 break
             except e:
-                pass
+                notime = True
+        for l in self.soltab_labels:
+            try:
+                self.frequencies = self.solset.getSoltab(l).getAxisValues('freq')
+            except e:
+                nofreq = True
         self.stations = self.soltab.getValues()[1]['ant']
         self.directions = [s.decode('utf-8') for s in self.solset.getSou().keys()]
         self.direction = 0
-        self.refant = self.stations[0]
+        self.refant = self.stations[0]#'CS001HBA0'
         self.wrapphase = True
 
         self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames())
@@ -523,6 +527,7 @@ class H5PlotGUI(QDialog):
             self.frequencies = self.soltab.getAxisValues('freq')
         except:
             # Soltab probably has no frequency axis.
+            self.frequencies = None
             pass
         rvals, raxes = reorder_soltab(self.soltab)
         self.stcache.update(rvals, raxes)
@@ -564,10 +569,10 @@ class H5PlotGUI(QDialog):
             # Requested combination not supported.
             return
         if 'freq' in self.soltab.getAxesNames():
-            plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations==self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self, direction=self.directions[self.direction])
+            plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations==self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self, direction=self.direction)
         else:
             # Probably TEC or another solution type with no frequency axis.
-            plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations==self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction])
+            plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations==self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.direction)
         self.figures.append(plot_window)
         plot_window.plot(x_axis, Y_AXIS, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
@@ -612,7 +617,7 @@ def reorder_soltab(st):
     """
     logging.info('Reordering soltab '+st.name)
     order_old = st.getAxesNames()
-    if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name) or ('tec' in st.name):
+    if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name) or ('tec' in st.name and 'freq' not in order_old):
         order_new = ['time', 'ant']
     else:
         order_new = ['time', 'freq', 'ant']
@@ -620,6 +625,7 @@ def reorder_soltab(st):
         order_new += ['pol']
     if 'dir' in order_old:
         order_new += ['dir']
+    print(order_old, order_new)
     reordered = reorderAxes(st.getValues()[0], order_old, order_new)
     reordered2 = {}
     for k in order_new:
