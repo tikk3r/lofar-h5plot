@@ -57,7 +57,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
 
     if axis_type == 'time':
         if ('rotationmeasure' in st.name) or ('faraday' in st.name) or ('tec' in st.name and 'freq' not in axes and 'dir' not in axes):
-            y_axis = values[:, antenna]
+            y_axis = values[:, antenna] - values[:, refantenna]
             Y_AXIS = y_axis
         elif ('pol' in axes) and ('dir' in axes):
             if st_type == 'phase':
@@ -67,7 +67,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
             elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and 'freq' not in axes):
-                y_axis = values[:, antenna, direction]
+                y_axis = values[:, antenna, direction] - values[:, refantenna, direction]
             else:
                 y_axis = values[:, freqslot, antenna, :, direction]
             Y_AXIS = []
@@ -84,7 +84,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
             elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec'):
-                y_axis = values[:, antenna]
+                y_axis = values[:, antenna] - values[:, refantenna]
             else:
                 y_axis = values[:, freqslot, antenna, :]
             Y_AXIS = []
@@ -100,13 +100,13 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
             elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and 'freq' not in axes):
-                y_axis = values[:, antenna, direction]
+                y_axis = values[:, antenna, direction] - values[:, refantenna, direction]
             else:
                 y_axis = values[:, freqslot, antenna, direction]
             Y_AXIS = y_axis
         elif ('pol' not in axes) and ('dir' not in axes):
             if (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec'):
-                y_axis = values[:, antenna]
+                y_axis = values[:, antenna] - values[:, refantenna]
             else:
                 y_axis = values[:, freqslot, antenna]
             Y_AXIS = y_axis
@@ -641,6 +641,9 @@ def wrap_phase(phase):
 
 
 if __name__ == '__main__':
+    print('H5Plot version 2.3.1')
+    print('Author: Frits Sweijen (frits.sweijen@gmail.com)')
+    print('Released under GPLv3\n')
     FILENAME = sys.argv[1]
     H5FILE = lh5.h5parm(FILENAME, readonly=True)
     # Set up for logging output.
