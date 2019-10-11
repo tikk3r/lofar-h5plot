@@ -608,7 +608,7 @@ def reorder_soltab(st):
     """
     logging.info('Reordering soltab ' + st.name)
     order_old = st.getAxesNames()
-    if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name) or ('tec' in st.name):
+    if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name) or ('tec' in st.name and 'freq' not in order_old):
         order_new = ['time', 'ant']
     else:
         order_new = ['time', 'freq', 'ant']
