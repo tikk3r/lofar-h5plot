@@ -117,11 +117,11 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
             if st_type == 'phase':
                 isphase = True
                 # Plot phase-like quantities w.r.t. to a reference antenna.
-                y_axis = values[timeslot, :, antenna, :, 0] - values[timeslot, :, refantenna, :, 0]
+                y_axis = values[timeslot, :, antenna, :, direction] - values[timeslot, :, refantenna, :, direction]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
             else:
-                y_axis = values[timeslot, :, antenna, :, 0]
+                y_axis = values[timeslot, :, antenna, :, direction]
             Y_AXIS = []
             plabels = []
             for i in range(y_axis.shape[1]):
@@ -145,11 +145,11 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
             if st_type == 'phase':
                 isphase = True
                 # Plot phase-like quantities w.r.t. to a reference antenna.
-                y_axis = values[timeslot, :, antenna, 0] - values[timeslot, :, refantenna, 0]
+                y_axis = values[timeslot, :, antenna, direction] - values[timeslot, :, refantenna, direction]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
             else:
-                y_axis = values[timeslot, :, antenna, 0]
+                y_axis = values[timeslot, :, antenna, direction]
             Y_AXIS = y_axis
         elif ('pol' not in axes) and ('dir' not in axes):
             y_axis = values[timeslot, :, antenna]
