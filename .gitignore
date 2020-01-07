@@ -5,3 +5,6 @@
 *.pyc
 *.simg
 
+build
+dist
+*.egg-info
