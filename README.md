@@ -22,7 +22,16 @@ or, when using the Singularity image,
 
     singularity run h5plot.simg <h5parm>
 
-![Screenshot](screen.png?raw=true)
+This package is also installable through pip:
+
+    pip install --upgrade https://github.com/revoltek/losoto/archive/master.zip
+    pip install lofar-h5plot
+
+After this, it can simply be run as:
+
+    h5plot <h5parm>
+
+![Screenshot](https://raw.githubusercontent.com/tikk3r/lofar-h5plot/master/screen.png)
 
 # Requirements
 * Python >= 3.6.4
