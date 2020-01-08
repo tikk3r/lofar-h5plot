@@ -13,12 +13,9 @@ From: ubuntu:18.04
     apt-get install -y git python3-pip
     apt-get install -y libgl1-mesa-glx qt5-default
 
-    git clone https://github.com/tikk3r/lofar-h5plot.git
-    pip3 install -r $INSTALLDIR/lofar-h5plot/requirements.txt
-
-    cp lofar-h5plot/h5plot $INSTALLDIR/
-    rm -rf $INSTALLDIR/lofar-h5plot
-    chmod 755 $INSTALLDIR/h5plot
+    python3 -m pip install --upgrade pip
+    python3 -m pip install --upgrade https://github.com/revoltek/losoto/archive/master.zip
+    python3 -m pip install lofar-h5plot
 
 %runscript
     export INSTALLDIR=/opt/h5plot
