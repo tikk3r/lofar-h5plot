@@ -16,15 +16,15 @@ From: ubuntu:18.04
     git clone https://github.com/tikk3r/lofar-h5plot.git
     pip3 install -r $INSTALLDIR/lofar-h5plot/requirements.txt
 
-    cp lofar-h5plot/h5plot.py $INSTALLDIR/
+    cp lofar-h5plot/h5plot $INSTALLDIR/
     rm -rf $INSTALLDIR/lofar-h5plot
-    chmod 755 $INSTALLDIR/h5plot.py
+    chmod 755 $INSTALLDIR/h5plot
 
 %runscript
     export INSTALLDIR=/opt/h5plot
     export PATH=$INSTALLDIR:$PATH
     alias python='python3'
-    h5plot.py "$@"
+    h5plot "$@"
 
 %help
     This Singularity image contains lofar-h5plot (https://github.com/tikk3r/lofar-h5plot).
