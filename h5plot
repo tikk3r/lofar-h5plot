@@ -223,6 +223,10 @@ class GraphWindow(QDialog):
         if 'time' in axis.lower():
             try:
                 self.select_label = QLabel('Freq slot {:.2f} MHz'.format(self.frequencies[freqslot] / 1e6))
+                if len(self.frequencies == 1):
+                    self.button_next.setEnabled(False)
+                else:
+                    self.button_next.setEnabled(True)
             except TypeError:
                 # No frequency axis.
                 self.select_label = QLabel('')
@@ -231,6 +235,10 @@ class GraphWindow(QDialog):
         elif 'freq' in axis.lower():
             try:
                 self.select_label = QLabel('Time: ' + self.format_time(timeslot))
+                if len(self.times == 1):
+                    self.button_next.setEnabled(False)
+                else:
+                    self.button_next.setEnabled(True)
             except TypeError:
                 # No time axis.
                 self.select_label = QLabel('')
@@ -567,6 +575,16 @@ class H5PlotGUI(QDialog):
         self.figures.append(plot_window)
         plot_window.plot(x_axis, Y_AXIS, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
+
+        if self.axis.lower() == 'freq' and (len(self.times) == 1):
+            plot_window.button_next.setEnabled(False)
+        elif self.axis.lower() == 'freq' and (len(self.times) > 1):
+            print('Multiple time slots detected, enabling buttons.')
+            plot_window.button_next.setEnabled(True)
+        if self.axis.lower() == 'time' and (len(self.frequencies) == 1):
+            plot_window.button_next.setEnabled(False)
+        if self.axis.lower() == 'time' and (len(self.frequencies) > 1):
+            plot_window.button_next.setEnabled(True)
 
 
 class SoltabCache:
