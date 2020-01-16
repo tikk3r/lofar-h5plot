@@ -576,6 +576,11 @@ class H5PlotGUI(QDialog):
         plot_window.plot(x_axis, Y_AXIS, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
 
+        # TEC does not have a frequency axis, so disable the button as well.
+        if 'tec' in self.soltab.name:
+            self.logger.debug('TEC solutions detected, disabling buttons.')
+            plot_window.button_next.setEnabled(False)
+            plot_window.button_prev.setEnabled(False)
         if self.axis.lower() == 'freq' and (len(self.times) == 1):
             plot_window.button_next.setEnabled(False)
             self.logger.debug('Single time slot detected, disabling buttons.')
