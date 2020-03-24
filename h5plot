@@ -404,7 +404,11 @@ class H5PlotGUI(QDialog):
             except TypeError:
                 pass
         self.stations = self.soltab.getValues()[1]['ant']
-        self.directions = [s.decode('utf-8') for s in self.solset.getSou().keys()]
+        try:
+            self.directions = [s.decode('utf-8') for s in self.solset.getSou().keys()]
+        except AttributeError:
+            # Probably normal string.
+            self.directions = [s for s in self.solset.getSou().keys()]
         self.direction = 0
         self.refant = self.stations[0]
         self.wrapphase = True

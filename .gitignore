@@ -4,6 +4,7 @@
 *.log
 *.pyc
 *.simg
+*.sif
 
 build
 dist
