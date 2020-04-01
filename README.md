@@ -16,7 +16,7 @@ The image is always the latest commit on the master branch, no guarantees on sta
 
 H5plot is a small GUI to view the solutions in an H5parm interactively. To run it directly, clone this repository and run as
 
-    python h5plot.py <h5parm>
+    python h5plot <h5parm>
 
 or, when using the Singularity image,
 
