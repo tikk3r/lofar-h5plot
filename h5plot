@@ -591,10 +591,10 @@ class H5PlotGUI(QDialog):
         elif self.axis.lower() == 'freq' and (len(self.times) > 1):
             self.logger.debug('Multiple time slots detected, enabling buttons.')
             plot_window.button_next.setEnabled(True)
-        if self.axis.lower() == 'time' and (len(self.frequencies) == 1):
+        if self.axis.lower() == 'time' and (self.frequencies is None or (len(self.frequencies) == 1)):
             plot_window.button_next.setEnabled(False)
             self.logger.debug('Single frequency slot detected, disabling buttons.')
-        if self.axis.lower() == 'time' and (len(self.frequencies) > 1):
+        elif self.axis.lower() == 'time' and (len(self.frequencies) > 1):
             self.logger.debug('Multiple frequency slots detected, enabling buttons.')
             plot_window.button_next.setEnabled(True)
 
