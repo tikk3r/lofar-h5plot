@@ -1,6 +1,6 @@
 <h1 align="center">LOFAR H5plot</h1>
 <p align="center">
-<a href="https://singularity-hub.org/collections/2492"><img alt="Singularity-Hub" align="center" src="https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg"></a>
+<a href="https://singularity-hub.org/collections/2492"><img alt="Singularity-Hub" src="https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg"></a>
 <img alt="Pylint" src="https://mperlet.github.io/pybadge/badges/8.37.svg?style=for-the-badge">
 <img alt="GitHub" src="https://img.shields.io/github/license/tikk3r/lofar-h5plot.svg">
 <img alt="Requires.io" src="https://img.shields.io/requires/github/tikk3r/lofar-h5plot.svg">
