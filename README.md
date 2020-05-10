@@ -5,8 +5,8 @@
 <img alt="GitHub" src="https://img.shields.io/github/license/tikk3r/lofar-h5plot.svg">
 <img alt="Requires.io" src="https://img.shields.io/requires/github/tikk3r/lofar-h5plot.svg">
 <a href="https://doi.org/10.5281/zenodo.3600479"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.3600479.svg" alt="DOI"></a>
-<a href="https://img.shields.io/pypi/v/lofar-h5plot?style=for-the-badge"></a>
-<a href="https://img.shields.io/pypi/pyversions/lofar-h5plot"></a>
+<img src="https://img.shields.io/pypi/v/lofar-h5plot">
+<img src="https://img.shields.io/pypi/pyversions/lofar-h5plot">
 </p>
 <p align="center">
 <b>Download the latest commit from Singularity-hub:</b><br/>
