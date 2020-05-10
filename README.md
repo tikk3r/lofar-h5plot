@@ -1,13 +1,15 @@
 <h1 align="center">LOFAR H5plot</h1>
 <p align="center">
-<img alt="Singularity-Hub" src="https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg" href="https://singularity-hub.org/collections/2492">
-<img alt="Pylint" src="https://mperlet.github.io/pybadge/badges/8.37.svg">
+<a href="https://singularity-hub.org/collections/2492"><img alt="Singularity-Hub" align="center" src="https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg"></a>
+<img alt="Pylint" src="https://mperlet.github.io/pybadge/badges/8.37.svg?style=for-the-badge">
 <img alt="GitHub" src="https://img.shields.io/github/license/tikk3r/lofar-h5plot.svg">
 <img alt="Requires.io" src="https://img.shields.io/requires/github/tikk3r/lofar-h5plot.svg">
 <a href="https://doi.org/10.5281/zenodo.3600479"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.3600479.svg" alt="DOI"></a>
+<a href="https://img.shields.io/pypi/v/lofar-h5plot?style=for-the-badge"></a>
+<a href="https://img.shields.io/pypi/pyversions/lofar-h5plot"></a>
 </p>
 <p align="center">
-    <b>Download the latest commit from Singularity-hub:</b><br/>
+<b>Download the latest commit from Singularity-hub:</b><br/>
 <tt>singularity pull --name h5plot.simg shub://tikk3r/lofar-h5plot</tt><br/>
 The image is always the latest commit on the master branch, no guarantees on stability.
 </p>
