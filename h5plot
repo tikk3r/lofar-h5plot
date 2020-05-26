@@ -292,7 +292,8 @@ class GraphWindow(QDialog):
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot)
+            diridx = self.parent.directions.index(self.direction)
+            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx)
             if (self.freqslot > 0) and (not self.button_prev.isEnabled()):
                 self.button_prev.setEnabled(True)
             if self.freqslot == (len(self.frequencies) - 1):
@@ -300,7 +301,8 @@ class GraphWindow(QDialog):
         elif 'freq' in self.xlabel.lower():
             self.timeslot += 1
             self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
-            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot)
+            diridx = self.parent.directions.index(self.direction)
+            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, direction=diridx)
             if self.timeslot < (len(self.times) - 1) and (not self.button_prev.isEnabled()):
                 self.button_prev.setEnabled(True)
             if self.timeslot == (len(self.times) - 1):
@@ -316,7 +318,8 @@ class GraphWindow(QDialog):
             if self.freqslot > 0:
                 self.freqslot -= 1
                 self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot)
+                diridx = self.parent.directions.index(self.direction)
+                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx)
                 if self.freqslot == 0:
                     self.button_prev.setEnabled(False)
                 if (self.freqslot < (len(self.frequencies) - 1)) and (not self.button_next.isEnabled()):
@@ -325,7 +328,8 @@ class GraphWindow(QDialog):
             if self.timeslot > 0:
                 self.timeslot -= 1
                 self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
-                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot)
+                diridx = self.parent.directions.index(self.direction)
+                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, direction=diridx)
                 if self.timeslot == 0:
                     self.button_prev.setEnabled(False)
                 if (self.timeslot < (len(self.parent.times) - 1)) and (not self.button_next.isEnabled()):
