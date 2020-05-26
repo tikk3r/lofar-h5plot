@@ -161,6 +161,61 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
     return x_axis, Y_AXIS, plabels, isphase
 
 
+def load_axes_2d(vals, st, antenna, refantenna, pol=0, direction=0):
+    """ Load a 2D slice from the H5Parm.
+
+    Args:
+        vals (ndarray): raw soltab values to load as obtained from Soltab.getValues().
+        st (soltab): soltab object.
+        antenna (str): name of the antenna to select. Automatically determined if set to `None`.
+        refant (int): index of the reference antenna.
+        pol (int): polarization to load.
+        direction (int): direction to load.
+    Returns:
+        x_axis (ndarray): time axis
+        y_axis (ndarray): frequency axis
+        plotvals (ndarray): 2d ndarray of soltab values
+        isphase (bool): boolean indicating whether or not the quantity is a phase.
+
+        OR
+
+        errorcode (str): an error message if things went wrong.
+    """
+    wrapphase = True
+    # Values have shape (timestamps, frequencies, antennas, polarizations, directions).
+    axes = st.getAxesNames()
+    st_type = st.getType()
+    x_axis = vals[1]['time']
+    y_axis = vals[1]['freq']
+    values = np.asarray(vals[0])
+    plabels = []
+    if st_type == 'phase':
+        isphase = True
+    else:
+        isphase = False
+    if isphase:
+        if 'pol' in axes:
+            if 'dir' in axes:
+                plotvals = values[:, :, antenna, pol, direction] - values[:, :, refantenna, pol, direction]
+            else:
+                plotvals = values[:, :, antenna, pol] - values[:, :, refantenna, pol]
+        elif 'dir' in axes:
+            plotvals = values[:, :, antenna, direction] - values[:, :, refantenna, direction]
+        if wrapphase:
+            plotvals = wrap_phase(plotvals)
+    else:
+        print(antenna, pol, direction)
+        if 'pol' in axes:
+            if 'dir' in axes:
+                plotvals = values[:, :, antenna, pol, direction]
+            else:
+                plotvals = values[:, :, antenna, pol]
+        elif 'dir' in axes:
+            plotvals = values[:, :, antenna, direction]
+
+    return x_axis, y_axis, plotvals, isphase
+
+
 class GraphWindow(QDialog):
     """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
     """
@@ -292,7 +347,8 @@ class GraphWindow(QDialog):
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot)
+            diridx = self.parent.directions.index(self.direction)
+            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx)
             if (self.freqslot > 0) and (not self.button_prev.isEnabled()):
                 self.button_prev.setEnabled(True)
             if self.freqslot == (len(self.frequencies) - 1):
@@ -300,7 +356,8 @@ class GraphWindow(QDialog):
         elif 'freq' in self.xlabel.lower():
             self.timeslot += 1
             self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
-            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot)
+            diridx = self.parent.directions.index(self.direction)
+            x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, direction=diridx)
             if self.timeslot < (len(self.times) - 1) and (not self.button_prev.isEnabled()):
                 self.button_prev.setEnabled(True)
             if self.timeslot == (len(self.times) - 1):
@@ -316,7 +373,8 @@ class GraphWindow(QDialog):
             if self.freqslot > 0:
                 self.freqslot -= 1
                 self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot)
+                diridx = self.parent.directions.index(self.direction)
+                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx)
                 if self.freqslot == 0:
                     self.button_prev.setEnabled(False)
                 if (self.freqslot < (len(self.frequencies) - 1)) and (not self.button_next.isEnabled()):
@@ -325,7 +383,8 @@ class GraphWindow(QDialog):
             if self.timeslot > 0:
                 self.timeslot -= 1
                 self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
-                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot)
+                diridx = self.parent.directions.index(self.direction)
+                x, y, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, direction=diridx)
                 if self.timeslot == 0:
                     self.button_prev.setEnabled(False)
                 if (self.timeslot < (len(self.parent.times) - 1)) and (not self.button_next.isEnabled()):
@@ -362,6 +421,173 @@ class GraphWindow(QDialog):
             self.ax.plot(xaxis, yaxis, 'h', color='C0')
         if isphase:
             self.ax.set_ylim(-np.pi, np.pi)
+        self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
+        self.canvas.draw()
+
+
+class GraphWindow2D(QDialog):
+    """ A window displaying the plotted 2D quantity. Allows the user to cycle through antenna.
+    """
+    def __init__(self, values, frametitle, antindex, refantindex, axis, st, polslot=0, direction=0, times=None, freqs=None, pols=None, parent=None):
+        """ Initialize a new GraphWindow instance.
+
+        Args:
+            frametitle (str): title the frame will hvae.
+            antindex (int): the index of the selected antenna.
+            polslot (int): index along the polarization axis to start with.
+            direction (int): index of the direction to plot.
+            parent (QDialog): parent window instance.
+        Returns:
+            None
+        """
+        super(GraphWindow2D, self).__init__()
+        # Set up for logging output.
+        self.LOGGER = logging.getLogger('GraphWindow')
+        # LOGGER.setLevel(logging.INFO)
+        self.LOGGER.setLevel(logging.DEBUG)
+
+        self.frametitle = frametitle
+        self.axis = axis
+        self.polslot = polslot
+        self.direction = direction
+        self.values = values
+        self.antindex = antindex
+        self.refantindex = refantindex
+        self.st = st
+        self.parent = parent
+        try:
+            self.polarizations = pols
+        except AttributeError:
+            pass
+
+        try:
+            self.frequencies = freqs
+        except AttributeError:
+            # frequencies is None, plotting against time.
+            pass
+
+        try:
+            self.times = times
+            self.times -= self.times[0]
+        except AttributeError:
+            # times is None, plotting against time.
+            pass
+
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.LOGFILEH = logging.FileHandler('h5plot.log')
+        self.LOGFILEH.setLevel(logging.DEBUG)
+        self.LOGFILEH.setFormatter(formatter)
+        self.LOGGER.addHandler(LOGFILEH)
+
+        self.setWindowTitle(frametitle)
+
+        self.button_next = QPushButton('Forward')
+        self.button_next.clicked.connect(self._forward_button_event)
+        self.button_prev = QPushButton('Back')
+        self.button_prev.clicked.connect(self._backward_button_event)
+        self.button_prev.setEnabled(False)
+        try:
+            self.select_label = QLabel('Corr.: {:s}'.format(self.polarizations[polslot]))
+            if len(self.polarizations) == 1:
+                self.button_next.setEnabled(False)
+            else:
+                self.button_next.setEnabled(True)
+        except TypeError:
+            # No frequency axis.
+            self.select_label = QLabel('')
+            self.button_next.setEnabled(False)
+            self.button_prev.setEnabled(False)
+        self.select_label.setAlignment(QtCore.Qt.AlignCenter)
+
+        self.buttons = QGridLayout()
+        self.buttons.addWidget(self.button_prev, 0, 0)
+        self.buttons.addWidget(self.select_label, 0, 1)
+        self.buttons.addWidget(self.button_next, 0, 2)
+
+        self.fig = Figure()
+        self.canvas = FigureCanvas(self.fig)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+
+        self.layout_plot = QVBoxLayout()
+        self.layout_plot.addWidget(self.toolbar)
+        self.layout_plot.addWidget(self.select_label)
+        self.layout_plot.addWidget(self.canvas)
+
+        self.layout = QFormLayout()
+        self.layout.addRow(self.layout_plot)
+        self.layout.addRow(self.buttons)
+        self.setLayout(self.layout)
+
+    def format_time(self, seconds):
+        """ Formats the time to be displayed in the plotting windows.
+
+        A string is formatted, displaying the time in seconds or (fractional) minutes or hours.
+
+        Args:
+            seconds (int): the time in seconds.
+        Returns:
+            formatted time (str): formatted time string.
+        """
+        if seconds < 60:
+            return '{:.3f} sec'.format(seconds)
+        elif 60 <= seconds < 3600:
+            return '{:.3f} min'.format(seconds / 60)
+        elif seconds >= 3600:
+            return '{:.3f} hr'.format(seconds / 3600)
+        else:
+            return '{:.3f}'.format(seconds)
+
+    def _forward_button_event(self):
+        """ An event triggered by pressing the "Forward" button of a GraphWindow.
+
+        When pressed, the abscissa is advanced one position, showing the next time or frequency slot.
+        """
+        if (self.polslot < (len(self.polarizations) - 1)):
+            self.polslot += 1
+        if (self.polslot > 0) and (not self.button_prev.isEnabled()):
+            self.button_prev.setEnabled(True)
+        if self.polslot == (len(self.polarizations) - 1):
+            self.button_next.setEnabled(False)
+        self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
+        diridx = self.parent.directions.index(self.direction)
+        x, y, z, p = load_axes_2d(self.values, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+        self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+
+    def _backward_button_event(self):
+        """ An event triggered by pressing the "Back" button of a GraphWindow.
+
+        When pressed, the abscissa is set back one position, showing the previous time or frequency slot.
+        """
+        if (self.polslot > 0):
+            self.polslot -= 1
+        if self.polslot == 0:
+            self.button_prev.setEnabled(False)
+        if (self.polslot < (len(self.polarizations) - 1)) and (not self.button_next.isEnabled()):
+            self.button_next.setEnabled(True)
+        self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
+        diridx = self.parent.directions.index(self.direction)
+        x, y, z, p = load_axes_2d(self.values, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+        self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+
+    def plot(self, xaxis, yaxis, zaxis, frametitle='', limits=[None, None], ax_labels=['', ''], multidim=False, isphase=False):
+        self.xlabel = ax_labels[0]
+        self.ylabel = ax_labels[1]
+        self.fig.clf()
+        self.ax = self.fig.add_subplot(111)
+        self.ax.clear()
+        # Start counting from t=0
+        xaxis = xaxis - xaxis[0]
+        yaxis = yaxis * 1e-6
+        if self.polarizations is not None:
+            self.ax.set_title(self.st.name + ' - {:s} - {:s}'.format(self.polarizations[self.polslot], self.direction))
+        else:
+            self.ax.set_title(self.st.name + ' - {:s}'.format(self.direction))
+        if isphase:
+            im = self.ax.imshow(zaxis.T, interpolation=None, extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='hsv')
+            im.set_clim(-np.pi, np.pi)
+        else:
+            im = self.ax.imshow(zaxis.T, interpolation=None, extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='viridis')
+        cb = self.fig.colorbar(im)
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
 
@@ -403,6 +629,12 @@ class H5PlotGUI(QDialog):
                 break
             except TypeError:
                 pass
+        for l in self.soltab_labels:
+            try:
+                self.polarizations = self.solset.getSoltab(l).getAxisValues('pol')
+                break
+            except TypeError:
+                pass
         self.stations = self.soltab.getValues()[1]['ant']
         try:
             self.directions = [s.decode('utf-8') for s in self.solset.getSou().keys()]
@@ -433,7 +665,7 @@ class H5PlotGUI(QDialog):
             self.soltab_picker.addItem(l)
         self.soltab_picker.activated.connect(self._soltab_picker_event)
         self.axis_picker = QComboBox()
-        self.axis_picker.addItems(['time', 'freq'])
+        self.axis_picker.addItems(['time', 'freq', 'waterfall'])
         self.axis_picker.activated.connect(self._axis_picker_event)
         self.axis = 'time'
 
@@ -556,7 +788,31 @@ class H5PlotGUI(QDialog):
         Calls the `plot` function subsecquently.
         """
         self.logger.debug('Plotting button pressed.')
-        self.plot(labels=(self.axis, self.soltab.name))
+        if self.axis == 'freq' or self.axis == 'time':
+            self.plot(labels=(self.axis, self.soltab.name))
+        elif self.axis == 'waterfall':
+            self.plot_waterfall(labels=('time', 'freq'))
+
+    def plot_waterfall(self, labels=('x-axis', 'y-axis')):
+        """ Show a two-dimensional waterfall plot of time vs. frequency.
+        """
+        if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name) or ('faraday' in self.soltab.name) or ('tec' in self.soltab.name)):
+            self.logger.info('Rotation Measure, clock, faraday or TEC cannot be plotted in 2D!')
+            return
+        self.logger.info('Plotting ' + self.soltab.name + \
+                         ' for ' + self.solset.name)
+        antenna = self.station_picker.currentRow()
+        # Data loaded here is xaxis, yaxis, zaxis, isphase
+        msg = load_axes_2d(self.stcache.values, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
+        try:
+            x, y, z, p = msg
+        except ValueError:
+            logging.info(msg)
+            return
+        plot_window = GraphWindow2D(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction])
+        self.figures.append(plot_window)
+        plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        plot_window.show()
 
     def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
