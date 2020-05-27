@@ -189,7 +189,7 @@ def load_axes_2d(vals, st, antenna, refantenna, pol=0, direction=0):
     y_axis = vals[1]['freq']
     values = np.asarray(vals[0])
     plabels = []
-    if st_type == 'phase':
+    if (st_type == 'phase') or (st_type == 'rotation'):
         isphase = True
     else:
         isphase = False
@@ -201,10 +201,11 @@ def load_axes_2d(vals, st, antenna, refantenna, pol=0, direction=0):
                 plotvals = values[:, :, antenna, pol] - values[:, :, refantenna, pol]
         elif 'dir' in axes:
             plotvals = values[:, :, antenna, direction] - values[:, :, refantenna, direction]
+        else:
+            plotvals = values[:, :, antenna] - values[:, :, refantenna]
         if wrapphase:
             plotvals = wrap_phase(plotvals)
     else:
-        print(antenna, pol, direction)
         if 'pol' in axes:
             if 'dir' in axes:
                 plotvals = values[:, :, antenna, pol, direction]
@@ -212,6 +213,8 @@ def load_axes_2d(vals, st, antenna, refantenna, pol=0, direction=0):
                 plotvals = values[:, :, antenna, pol]
         elif 'dir' in axes:
             plotvals = values[:, :, antenna, direction]
+        else:
+            plotvals = values[:, :, antenna] - values[:, :, refantenna]
 
     return x_axis, y_axis, plotvals, isphase
 
@@ -487,13 +490,16 @@ class GraphWindow2D(QDialog):
         self.button_prev.clicked.connect(self._backward_button_event)
         self.button_prev.setEnabled(False)
         try:
-            self.select_label = QLabel('Corr.: {:s}'.format(self.polarizations[polslot]))
-            if len(self.polarizations) == 1:
-                self.button_next.setEnabled(False)
+            if self.st.getType() not in ['rotation', 'tec']:
+                self.select_label = QLabel('Corr.: {:s}'.format(self.polarizations[polslot]))
+                if len(self.polarizations) == 1:
+                    self.button_next.setEnabled(False)
+                else:
+                    self.button_next.setEnabled(True)
             else:
-                self.button_next.setEnabled(True)
+                raise TypeError
         except TypeError:
-            # No frequency axis.
+            # No pol axis.
             self.select_label = QLabel('')
             self.button_next.setEnabled(False)
             self.button_prev.setEnabled(False)
@@ -583,10 +589,10 @@ class GraphWindow2D(QDialog):
         else:
             self.ax.set_title(self.st.name + ' - {:s}'.format(self.direction))
         if isphase:
-            im = self.ax.imshow(zaxis.T, interpolation=None, extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='hsv')
+            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='jet')
             im.set_clim(-np.pi, np.pi)
         else:
-            im = self.ax.imshow(zaxis.T, interpolation=None, extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='viridis')
+            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='viridis')
         cb = self.fig.colorbar(im)
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
