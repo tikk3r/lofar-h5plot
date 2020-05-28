@@ -247,6 +247,7 @@ class GraphWindow(QDialog):
             None
         """
         super(GraphWindow, self).__init__()
+        self.setWindowFlags(QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowMinMaxButtonsHint | QtCore.Qt.WindowCloseButtonHint)
         # Set up for logging output.
         self.LOGGER = logging.getLogger('GraphWindow')
         # LOGGER.setLevel(logging.INFO)
@@ -450,6 +451,7 @@ class GraphWindow2D(QDialog):
             None
         """
         super(GraphWindow2D, self).__init__()
+        self.setWindowFlags(QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowMinMaxButtonsHint | QtCore.Qt.WindowCloseButtonHint)
         # Set up for logging output.
         self.LOGGER = logging.getLogger('GraphWindow')
         # LOGGER.setLevel(logging.INFO)
