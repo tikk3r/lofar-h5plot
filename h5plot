@@ -323,14 +323,10 @@ class GraphWindow(QDialog):
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
 
-        self.layout_plot = QVBoxLayout()
-        self.layout_plot.addWidget(self.toolbar)
-        self.layout_plot.addWidget(self.select_label)
-        self.layout_plot.addWidget(self.canvas)
-
-        self.layout = QFormLayout()
-        self.layout.addRow(self.layout_plot)
-        self.layout.addRow(self.buttons)
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.toolbar)
+        self.layout.addWidget(self.canvas)
+        self.layout.addItem(self.buttons)
         self.setLayout(self.layout)
 
     def format_time(self, seconds):
@@ -524,14 +520,10 @@ class GraphWindow2D(QDialog):
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
 
-        self.layout_plot = QVBoxLayout()
-        self.layout_plot.addWidget(self.toolbar)
-        self.layout_plot.addWidget(self.select_label)
-        self.layout_plot.addWidget(self.canvas)
-
-        self.layout = QFormLayout()
-        self.layout.addRow(self.layout_plot)
-        self.layout.addRow(self.buttons)
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.toolbar)
+        self.layout.addWidget(self.canvas)
+        self.layout.addItem(self.buttons)
         self.setLayout(self.layout)
 
     def format_time(self, seconds):
