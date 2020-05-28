@@ -189,20 +189,30 @@ def load_axes_2d(vals, st, antenna, refantenna, pol=0, direction=0):
     y_axis = vals[1]['freq']
     values = np.asarray(vals[0])
     plabels = []
+    pols = vals[1]['pol']
     if (st_type == 'phase') or (st_type == 'rotation'):
         isphase = True
     else:
         isphase = False
     if isphase:
-        if 'pol' in axes:
+        if 'polalign' in st.name:
+            # Special case. We must plot XX-YY and XX is 0 so not informative anyway.
+            # There's probably a nicer way of doing this.
+            # This by definition has polarizations, no need to check.
             if 'dir' in axes:
-                plotvals = values[:, :, antenna, pol, direction] - values[:, :, refantenna, pol, direction]
+                plotvals = (values[:, :, antenna, pols.index['XX'], direction] - values[:, :, antenna, pols.index['YY'], direction]) - (values[:, :, refantenna, pols.index['XX'], direction] - values[:, :, refantenna, pols.index['YY'], direction])
             else:
-                plotvals = values[:, :, antenna, pol] - values[:, :, refantenna, pol]
-        elif 'dir' in axes:
-            plotvals = values[:, :, antenna, direction] - values[:, :, refantenna, direction]
+                plotvals = (values[:, :, antenna, pols.index['XX']] - values[:, :, antenna, pols.index['YY']]) - (values[:, :, refantenna, pols.index['XX']] - values[:, :, refantenna, pols.index['YY']])
         else:
-            plotvals = values[:, :, antenna] - values[:, :, refantenna]
+            if 'pol' in axes:
+                if 'dir' in axes:
+                    plotvals = values[:, :, antenna, pol, direction] - values[:, :, refantenna, pol, direction]
+                else:
+                    plotvals = values[:, :, antenna, pol] - values[:, :, refantenna, pol]
+            elif 'dir' in axes:
+                plotvals = values[:, :, antenna, direction] - values[:, :, refantenna, direction]
+            else:
+                plotvals = values[:, :, antenna] - values[:, :, refantenna]
         if wrapphase:
             plotvals = wrap_phase(plotvals)
     else:
