@@ -189,7 +189,10 @@ def load_axes_2d(vals, st, antenna, refantenna, pol=0, direction=0):
     y_axis = vals[1]['freq']
     values = np.asarray(vals[0])
     plabels = []
-    pols = vals[1]['pol']
+    try:
+        pols = vals[1]['pol']
+    except:
+        logging.debug('No polarization axis present.')
     if (st_type == 'phase') or (st_type == 'rotation'):
         isphase = True
     else:
