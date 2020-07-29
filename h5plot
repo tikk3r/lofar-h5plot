@@ -596,10 +596,10 @@ class GraphWindow2D(QDialog):
         else:
             self.ax.set_title(self.st.name + ' - {:s}'.format(self.direction))
         if isphase:
-            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='jet')
+            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='jet', origin='lower')
             im.set_clim(-np.pi, np.pi)
         else:
-            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='viridis')
+            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='viridis', origin='lower')
         cb = self.fig.colorbar(im)
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
