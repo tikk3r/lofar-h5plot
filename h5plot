@@ -198,11 +198,12 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
     return x_axis, Y_AXIS, Y_AXIS_WEIGHT, plabels, isphase
 
 
-def load_axes_2d(vals, st, antenna, refantenna, pol=0, direction=0):
+def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
     """ Load a 2D slice from the H5Parm.
 
     Args:
         vals (ndarray): raw soltab values to load as obtained from Soltab.getValues().
+        weights (ndarray): weights corresponding to vals.
         st (soltab): soltab object.
         antenna (str): name of the antenna to select. Automatically determined if set to `None`.
         refant (int): index of the reference antenna.
@@ -247,26 +248,34 @@ def load_axes_2d(vals, st, antenna, refantenna, pol=0, direction=0):
             if 'pol' in axes:
                 if 'dir' in axes:
                     plotvals = values[:, :, antenna, pol, direction] - values[:, :, refantenna, pol, direction]
+                    plotvals_weight = weights[:, :, antenna, pol, direction]
                 else:
                     plotvals = values[:, :, antenna, pol] - values[:, :, refantenna, pol]
+                    plotvals_weight = weights[:, :, antenna, pol]
             elif 'dir' in axes:
                 plotvals = values[:, :, antenna, direction] - values[:, :, refantenna, direction]
+                plotvals_weight = weights[:, :, antenna, direction]
             else:
                 plotvals = values[:, :, antenna] - values[:, :, refantenna]
+                plotvals_weight = weights[:, :, antenna]
         if wrapphase:
             plotvals = wrap_phase(plotvals)
     else:
         if 'pol' in axes:
             if 'dir' in axes:
                 plotvals = values[:, :, antenna, pol, direction]
+                plotvals_weight = values[:, :, antenna, pol, direction]
             else:
                 plotvals = values[:, :, antenna, pol]
+                plotvals_weight = weights[:, :, antenna, pol]
         elif 'dir' in axes:
             plotvals = values[:, :, antenna, direction]
+            plotvals_weight = weights[:, :, antenna, direction]
         else:
             plotvals = values[:, :, antenna] - values[:, :, refantenna]
+            plotvals_weight = weights[:, :, antenna]
 
-    return x_axis, y_axis, plotvals, isphase
+    return x_axis, y_axis, plotvals, plotvals_weight, isphase
 
 
 class GraphWindow(QDialog):
@@ -503,11 +512,13 @@ class GraphWindow(QDialog):
 class GraphWindow2D(QDialog):
     """ A window displaying the plotted 2D quantity. Allows the user to cycle through antenna.
     """
-    def __init__(self, values, frametitle, antindex, refantindex, axis, st, polslot=0, direction=0, times=None, freqs=None, pols=None, parent=None):
+    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, polslot=0, direction=0, times=None, freqs=None, pols=None, parent=None):
         """ Initialize a new GraphWindow instance.
 
         Args:
-            frametitle (str): title the frame will hvae.
+            values (ndarray): array of values to plot.
+            weights (ndarray): array of weights corresponding to the values.
+            frametitle (str): title the frame will have.
             antindex (int): the index of the selected antenna.
             polslot (int): index along the polarization axis to start with.
             direction (int): index of the direction to plot.
@@ -527,6 +538,7 @@ class GraphWindow2D(QDialog):
         self.polslot = polslot
         self.direction = direction
         self.values = values
+        self.weights = weights
         self.antindex = antindex
         self.refantindex = refantindex
         self.st = st
@@ -625,7 +637,7 @@ class GraphWindow2D(QDialog):
             self.button_next.setEnabled(False)
         self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
         diridx = self.parent.directions.index(self.direction)
-        x, y, z, p = load_axes_2d(self.values, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+        x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
         self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
 
     def _backward_button_event(self):
@@ -641,7 +653,7 @@ class GraphWindow2D(QDialog):
             self.button_next.setEnabled(True)
         self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
         diridx = self.parent.directions.index(self.direction)
-        x, y, z, p = load_axes_2d(self.values, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+        x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
         self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
 
     def plot(self, xaxis, yaxis, zaxis, frametitle='', limits=[None, None], ax_labels=['', ''], multidim=False, isphase=False):
@@ -658,10 +670,14 @@ class GraphWindow2D(QDialog):
         else:
             self.ax.set_title(self.st.name + ' - {:s}'.format(self.direction))
         if isphase:
-            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='jet', origin='lower')
+            current_cmap = matplotlib.cm.get_cmap('jet')
+            current_cmap.set_bad(color='w')
+            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap=current_cmap, origin='lower')
             im.set_clim(-np.pi, np.pi)
         else:
-            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap='viridis', origin='lower')
+            current_cmap = matplotlib.cm.get_cmap('viridis')
+            current_cmap.set_bad(color='w')
+            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap=current_cmap, origin='lower')
         cb = self.fig.colorbar(im)
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
@@ -878,14 +894,16 @@ class H5PlotGUI(QDialog):
                          ' for ' + self.solset.name)
         antenna = self.station_picker.currentRow()
         # Data loaded here is xaxis, yaxis, zaxis, isphase
-        msg = load_axes_2d(self.stcache.values, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
+        print('Loading data')
+        msg = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
         try:
-            x, y, z, p = msg
+            x, y, z, zw, p = msg
         except ValueError:
-            logging.info(msg)
+            logging.error('Error loading 2D data!')
             return
-        plot_window = GraphWindow2D(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction])
+        plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction])
         self.figures.append(plot_window)
+        z[zw == 0] = np.nan
         plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
         plot_window.show()
 
