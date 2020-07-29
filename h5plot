@@ -125,7 +125,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
             Y_AXIS = y_axis
             Y_AXIS_WEIGHT = y_axis_weight
         elif ('pol' not in axes) and ('dir' not in axes):
-            if (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and not 'freq' in axes):
+            if (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and 'freq' not in axes):
                 y_axis = values[:, antenna] - values[:, refantenna]
                 y_axis_weight = weights[:, antenna]
             elif (st_type == 'tec' and 'freq' in axes):
@@ -672,12 +672,12 @@ class GraphWindow2D(QDialog):
         if isphase:
             current_cmap = matplotlib.cm.get_cmap('jet')
             current_cmap.set_bad(color='w')
-            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap=current_cmap, origin='lower')
+            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0], xaxis[-1], yaxis[0], yaxis[-1]], aspect='auto', cmap=current_cmap, origin='lower')
             im.set_clim(-np.pi, np.pi)
         else:
             current_cmap = matplotlib.cm.get_cmap('viridis')
             current_cmap.set_bad(color='w')
-            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]], aspect='auto', cmap=current_cmap, origin='lower')
+            im = self.ax.imshow(zaxis.T, interpolation='antialiased', extent=[xaxis[0], xaxis[-1], yaxis[0], yaxis[-1]], aspect='auto', cmap=current_cmap, origin='lower')
         cb = self.fig.colorbar(im)
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
