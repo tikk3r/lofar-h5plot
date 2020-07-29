@@ -144,45 +144,57 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 isphase = True
                 # Plot phase-like quantities w.r.t. to a reference antenna.
                 y_axis = values[timeslot, :, antenna, :, direction] - values[timeslot, :, refantenna, :, direction]
+                y_axis_weight = weights[timeslot, :, antenna, :, direction]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
             else:
                 y_axis = values[timeslot, :, antenna, :, direction]
+                y_axis_weight = weights[timeslot, :, antenna, :, direction]
             Y_AXIS = []
+            Y_AXIS_WEIGHT = []
             plabels = []
             for i in range(y_axis.shape[1]):
                 Y_AXIS.append(y_axis[:, i])
+                Y_AXIS_WEIGHT.append(y_axis_weight[:, i])
                 plabels.append(vals[1]['pol'][i])
         elif 'pol' in axes:
             if st_type == 'phase':
                 isphase = True
                 # Plot phase-like quantities w.r.t. to a reference antenna.
                 y_axis = values[timeslot, :, antenna, :] - values[timeslot, :, refantenna, :]
+                y_axis_weight = weights[timeslot, :, antenna, :]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
             else:
                 y_axis = values[timeslot, :, antenna, :]
+                y_axis_weight = weights[timeslot, :, antenna, :]
             Y_AXIS = []
+            Y_AXIS_WEIGHT = []
             plabels = []
             for i in range(y_axis.shape[1]):
                 Y_AXIS.append(y_axis[:, i])
+                Y_AXIS_WEIGHT.append(y_axis_weight[:, i])
                 plabels.append(vals[1]['pol'][i])
         elif 'dir' in axes:
             if st_type == 'phase':
                 isphase = True
                 # Plot phase-like quantities w.r.t. to a reference antenna.
                 y_axis = values[timeslot, :, antenna, direction] - values[timeslot, :, refantenna, direction]
+                y_axis_weight = weights[timeslot, :, antenna, direction]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
             else:
                 y_axis = values[timeslot, :, antenna, direction]
+                y_axis_weight = weights[timeslot, :, antenna, direction]
             Y_AXIS = y_axis
+            Y_AXIS_WEIGHT = y_axis_weight
         elif ('pol' not in axes) and ('dir' not in axes):
             y_axis = values[timeslot, :, antenna]
+            y_axis_weight = weights[timeslot, :, antenna]
             Y_AXIS = y_axis
+            Y_AXIS_WEIGHT = y_axis_weight
     if len(plabels) == 0:
         plabels = ['', '', '', '']
-    print(Y_AXIS_WEIGHT)
     return x_axis, Y_AXIS, Y_AXIS_WEIGHT, plabels, isphase
 
 
