@@ -924,7 +924,7 @@ class H5PlotGUI(QDialog):
             plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self, direction=self.directions[self.direction])
         else:
             # Probably TEC or another solution type with no frequency axis.
-            plot_window = GraphWindow(self.stcache.values, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction])
+            plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction])
         self.figures.append(plot_window)
         plot_window.plot(x_axis, Y_AXIS, Y_AXIS_WEIGHT, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
