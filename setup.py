@@ -5,7 +5,7 @@ with open('README.md', 'r') as f:
 
 setuptools.setup(
     name='lofar-h5plot',
-    version='2.4.1',
+    version='2.5.2',
     scripts=['h5plot'],
     author='Frits Sweijen',
     author_email='frits.sweijen@gmail.com',
