@@ -16,6 +16,10 @@ The image is always the latest commit on the master branch, no guarantees on sta
 
 ---
 
+![Install & linting](https://github.com/tikk3r/lofar-h5plot/workflows/Install%20&%20linting/badge.svg)
+
+---
+
 H5plot is a small GUI to view the solutions in an H5parm interactively. To run it directly, clone this repository and run as
 
     python h5plot <h5parm>
