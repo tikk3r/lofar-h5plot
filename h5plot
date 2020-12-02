@@ -61,6 +61,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
         weights = np.ones(values.shape)
 
     if axis_type == 'time':
+        print('Axis type is ' + axis_type + ' and soltab name is ' + st.name + ' and axes are ' + ','.join(axes))
         if ('rotationmeasure' in st.name) or ('faraday' in st.name) or ('tec' in st.name and 'freq' not in axes and 'dir' not in axes):
             y_axis = values[:, antenna] - values[:, refantenna]
             y_axis_weight = weights[:, antenna]
@@ -126,13 +127,14 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
             Y_AXIS = y_axis
             Y_AXIS_WEIGHT = y_axis_weight
         elif ('pol' not in axes) and ('dir' not in axes):
-            if (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and 'freq' not in axes):
+            if (st_type == 'clock') or (st_type == 'rotationmeasure') or ((st_type == 'tec' or st_type == 'phase') and 'freq' not in axes):
                 y_axis = values[:, antenna] - values[:, refantenna]
                 y_axis_weight = weights[:, antenna]
-            elif (st_type == 'tec' and 'freq' in axes):
+            elif ((st_type == 'tec' or st_type == 'phase') and 'freq' in axes):
                 y_axis = values[:, 0, antenna] - values[:, 0, refantenna]
                 y_axis_weight = weights[:, 0, antenna]
             else:
+                # Assume normal time, freq, antenna ordering.
                 y_axis = values[:, freqslot, antenna]
                 y_axis_weight = weights[:, freqslot, antenna]
             Y_AXIS = y_axis
@@ -992,7 +994,7 @@ def reorder_soltab(st):
         st_new (tuple): tuple of (values, weights, axes) reodered to the expected order.
         order_new (ndarray): array containing the reordered order of the axes.
     """
-    logging.info('Reordering soltab ' + st.name)
+    LOGGER.info('Reordering soltab ' + st.name)
     order_old = st.getAxesNames()
     if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name) or ('tec' in st.name and 'freq' not in order_old):
         order_new = ['time', 'ant']
@@ -1062,9 +1064,9 @@ if __name__ == '__main__':
 
     # Initialize the GUI.
     APP = QApplication(sys.argv)
-    GUI = H5PlotGUI(FILENAME, LOGGER)
+    GUI = H5PlotGUI(args.FILENAME, LOGGER)
     GUI.show()
     APP.exec_()
 
     H5FILE.close()
-    LOGGER.info('%s successfully closed.', FILENAME)
+    LOGGER.info('%s successfully closed.', args.FILENAME)
