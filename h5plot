@@ -61,7 +61,6 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
         weights = np.ones(values.shape)
 
     if axis_type == 'time':
-        print('Axis type is ' + axis_type + ' and soltab name is ' + st.name + ' and axes are ' + ','.join(axes))
         if ('rotationmeasure' in st.name) or ('faraday' in st.name) or ('tec' in st.name and 'freq' not in axes and 'dir' not in axes):
             y_axis = values[:, antenna] - values[:, refantenna]
             y_axis_weight = weights[:, antenna]
@@ -75,7 +74,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 y_axis_weight = weights[:, freqslot, antenna, :, direction]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
-            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and 'freq' not in axes):
+            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or ((st_type == 'tec' or st_type == 'phase') and 'freq' not in axes):
                 y_axis = values[:, antenna, direction] - values[:, refantenna, direction]
                 y_axis_weight = weights[:, antenna, direction]
             else:
@@ -725,7 +724,8 @@ class H5PlotGUI(QDialog):
                 pass
         for l in self.soltab_labels:
             try:
-                self.polarizations = self.solset.getSoltab(l).getAxisValues('pol')
+                if 'pol' in self.solset.getSoltab(l).getAxesNames():
+                    self.polarizations = self.solset.getSoltab(l).getAxisValues('pol')
                 break
             except TypeError:
                 pass
