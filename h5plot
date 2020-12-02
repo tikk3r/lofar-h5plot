@@ -96,7 +96,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 y_axis_weight = weights[:, freqslot, antenna, :]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
-            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec'):
+            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec') or (st_type == 'phase' and 'freq' not in axes):
                 y_axis = values[:, antenna] - values[:, refantenna]
                 y_axis_weight = weights[:, antenna]
             else:
@@ -117,7 +117,7 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 y_axis_weight = weights[:, freqslot, antenna, direction]
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
-            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or (st_type == 'tec' and 'freq' not in axes):
+            elif (st_type == 'clock') or (st_type == 'rotationmeasure') or ((st_type == 'tec' or st_type == 'phase') and 'freq' not in axes):
                 y_axis = values[:, antenna, direction] - values[:, refantenna, direction]
                 y_axis_weight = weights[:, antenna, direction]
             else:
