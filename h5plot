@@ -6,8 +6,8 @@ import logging
 import signal
 import sys
 
-from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QLabel, \
-    QListWidget, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
+    QListWidget, QPushButton, QVBoxLayout, QWidget
 from PyQt5 import QtCore
 
 from losoto.lib_operations import reorderAxes
@@ -230,7 +230,7 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
     values = np.asarray(vals[0])
     plabels = []
     try:
-        pols = vals[1]['pol']
+        pols = list(vals[1]['pol'])
     except:
         logging.debug('No polarization axis present.')
     if (st_type == 'phase') or (st_type == 'rotation'):
@@ -243,9 +243,11 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
             # There's probably a nicer way of doing this.
             # This by definition has polarizations, no need to check.
             if 'dir' in axes:
-                plotvals = (values[:, :, antenna, pols.index['XX'], direction] - values[:, :, antenna, pols.index['YY'], direction]) - (values[:, :, refantenna, pols.index['XX'], direction] - values[:, :, refantenna, pols.index['YY'], direction])
+                plotvals = (values[:, :, antenna, pols.index('XX'), direction] - values[:, :, antenna, pols.index('YY'), direction]) - (values[:, :, refantenna, pols.index('XX'), direction] - values[:, :, refantenna, pols.index('YY'), direction])
+                plotvals_weight = weights[:, :, antenna, pol, direction]
             else:
-                plotvals = (values[:, :, antenna, pols.index['XX']] - values[:, :, antenna, pols.index['YY']]) - (values[:, :, refantenna, pols.index['XX']] - values[:, :, refantenna, pols.index['YY']])
+                plotvals = (values[:, :, antenna, pols.index('XX')] - values[:, :, antenna, pols.index('YY')]) - (values[:, :, refantenna, pols.index('XX')] - values[:, :, refantenna, pols.index('YY')])
+                plotvals_weight = weights[:, :, antenna, pol]
         else:
             if 'pol' in axes:
                 if 'dir' in axes:
@@ -367,6 +369,16 @@ class GraphWindow(QDialog):
                 self.button_prev.setEnabled(False)
         self.select_label.setAlignment(QtCore.Qt.AlignCenter)
 
+        self.btn_antiter_next = QPushButton('Next antenna')
+        self.btn_antiter_next.clicked.connect(self._antiter_next_button_event)
+        self.btn_antiter_prev = QPushButton('Previous antenna')
+        self.btn_antiter_prev.clicked.connect(self._antiter_prev_button_event)
+
+        antiter_widget = QWidget()
+        antiter_layout = QHBoxLayout(antiter_widget)
+        antiter_layout.addWidget(self.btn_antiter_prev)
+        antiter_layout.addWidget(self.btn_antiter_next)
+
         self.buttons = QGridLayout()
         self.buttons.addWidget(self.button_prev, 0, 0)
         self.buttons.addWidget(self.select_label, 0, 1)
@@ -380,6 +392,7 @@ class GraphWindow(QDialog):
         self.layout.addWidget(self.toolbar)
         self.layout.addWidget(self.canvas)
         self.layout.addItem(self.buttons)
+        self.layout.addWidget(antiter_widget)
         self.setLayout(self.layout)
 
     def format_time(self, seconds):
@@ -400,6 +413,29 @@ class GraphWindow(QDialog):
             return '{:.3f} hr'.format(seconds / 3600)
         else:
             return '{:.3f}'.format(seconds)
+
+    def _antiter_next_button_event(self):
+        if (self.antindex + 1) < len(self.parent.stations):
+            self.antindex += 1
+        else:
+            self.antindex = 0
+        diridx = self.parent.directions.index(self.direction)
+        x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx)
+        self.frametitle = self.parent.stations[self.antindex]
+        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+        self.setWindowTitle(self.frametitle)
+
+    def _antiter_prev_button_event(self):
+        if (self.antindex - 1) > 0:
+            self.antindex -= 1
+        else:
+            self.antindex = len(self.parent.stations) - 1
+        diridx = self.parent.directions.index(self.direction)
+        x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx)
+        self.frametitle = self.parent.stations[self.antindex]
+        self.frametitle = self.parent.stations[self.antindex]
+        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+        self.setWindowTitle(self.frametitle)
 
     def _forward_button_event(self):
         """ An event triggered by pressing the "Forward" button of a GraphWindow.
@@ -592,6 +628,16 @@ class GraphWindow2D(QDialog):
             self.button_prev.setEnabled(False)
         self.select_label.setAlignment(QtCore.Qt.AlignCenter)
 
+        self.btn_antiter_next = QPushButton('Next antenna')
+        self.btn_antiter_next.clicked.connect(self._antiter_next_button_event)
+        self.btn_antiter_prev = QPushButton('Previous antenna')
+        self.btn_antiter_prev.clicked.connect(self._antiter_prev_button_event)
+
+        antiter_widget = QWidget()
+        antiter_layout = QHBoxLayout(antiter_widget)
+        antiter_layout.addWidget(self.btn_antiter_prev)
+        antiter_layout.addWidget(self.btn_antiter_next)
+
         self.buttons = QGridLayout()
         self.buttons.addWidget(self.button_prev, 0, 0)
         self.buttons.addWidget(self.select_label, 0, 1)
@@ -605,6 +651,7 @@ class GraphWindow2D(QDialog):
         self.layout.addWidget(self.toolbar)
         self.layout.addWidget(self.canvas)
         self.layout.addItem(self.buttons)
+        self.layout.addWidget(antiter_widget)
         self.setLayout(self.layout)
 
     def format_time(self, seconds):
@@ -625,6 +672,28 @@ class GraphWindow2D(QDialog):
             return '{:.3f} hr'.format(seconds / 3600)
         else:
             return '{:.3f}'.format(seconds)
+
+    def _antiter_next_button_event(self):
+        if (self.antindex + 1) < len(self.parent.stations):
+            self.antindex += 1
+        else:
+            self.antindex = 0
+        diridx = self.parent.directions.index(self.direction)
+        x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+        self.frametitle = self.parent.stations[self.antindex]
+        self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.frametitle)
+        self.setWindowTitle(self.frametitle)
+
+    def _antiter_prev_button_event(self):
+        if (self.antindex - 1) > 0:
+            self.antindex -= 1
+        else:
+            self.antindex = len(self.parent.stations) - 1
+        diridx = self.parent.directions.index(self.direction)
+        x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+        self.frametitle = self.parent.stations[self.antindex]
+        self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.frametitle)
+        self.setWindowTitle(self.frametitle)
 
     def _forward_button_event(self):
         """ An event triggered by pressing the "Forward" button of a GraphWindow.
@@ -668,9 +737,9 @@ class GraphWindow2D(QDialog):
         xaxis = xaxis - xaxis[0]
         yaxis = yaxis * 1e-6
         if self.polarizations is not None:
-            self.ax.set_title(self.st.name + ' - {:s} - {:s}'.format(self.polarizations[self.polslot], self.direction))
+            self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s}'.format(self.polarizations[self.polslot], self.direction))
         else:
-            self.ax.set_title(self.st.name + ' - {:s}'.format(self.direction))
+            self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s}'.format(self.direction))
         if isphase:
             current_cmap = matplotlib.cm.get_cmap('jet')
             current_cmap.set_bad(color='w')
@@ -904,10 +973,14 @@ class H5PlotGUI(QDialog):
         except ValueError:
             logging.error('Error loading 2D data!')
             return
-        plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction])
+        try:
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction])
+        except AttributeError:
+            # No polarizations most likely.
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction])
         self.figures.append(plot_window)
         z[zw == 0] = np.nan
-        plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
         plot_window.show()
 
     def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
