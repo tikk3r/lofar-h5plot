@@ -973,6 +973,9 @@ class H5PlotGUI(QDialog):
         except ValueError:
             logging.error('Error loading 2D data!')
             return
+        if (len(x) == 1) or (len(y) == 1):
+            self.logger.info('Either time or frequency has only 1 entry, not plotting!')
+            return
         try:
             plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction])
         except AttributeError:
