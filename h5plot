@@ -230,7 +230,7 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
     values = np.asarray(vals[0])
     plabels = []
     try:
-        pols = vals[1]['pol']
+        pols = list(vals[1]['pol'])
     except:
         logging.debug('No polarization axis present.')
     if (st_type == 'phase') or (st_type == 'rotation'):
@@ -243,9 +243,11 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
             # There's probably a nicer way of doing this.
             # This by definition has polarizations, no need to check.
             if 'dir' in axes:
-                plotvals = (values[:, :, antenna, pols.index['XX'], direction] - values[:, :, antenna, pols.index['YY'], direction]) - (values[:, :, refantenna, pols.index['XX'], direction] - values[:, :, refantenna, pols.index['YY'], direction])
+                plotvals = (values[:, :, antenna, pols.index('XX'), direction] - values[:, :, antenna, pols.index('YY'), direction]) - (values[:, :, refantenna, pols.index('XX'), direction] - values[:, :, refantenna, pols.index('YY'), direction])
+                plotvals_weight = weights[:, :, antenna, pol, direction]
             else:
-                plotvals = (values[:, :, antenna, pols.index['XX']] - values[:, :, antenna, pols.index['YY']]) - (values[:, :, refantenna, pols.index['XX']] - values[:, :, refantenna, pols.index['YY']])
+                plotvals = (values[:, :, antenna, pols.index('XX')] - values[:, :, antenna, pols.index('YY')]) - (values[:, :, refantenna, pols.index('XX')] - values[:, :, refantenna, pols.index('YY')])
+                plotvals_weight = weights[:, :, antenna, pol]
         else:
             if 'pol' in axes:
                 if 'dir' in axes:
@@ -971,7 +973,11 @@ class H5PlotGUI(QDialog):
         except ValueError:
             logging.error('Error loading 2D data!')
             return
-        plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction])
+        try:
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction])
+        except AttributeError:
+            # No polarizations most likely.
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction])
         self.figures.append(plot_window)
         z[zw == 0] = np.nan
         plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
