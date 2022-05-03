@@ -5,6 +5,7 @@ __version__ = 'v2.6.0'
 import logging
 import signal
 import sys
+import time
 
 from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
     QListWidget, QPushButton, QVBoxLayout, QWidget
@@ -959,6 +960,8 @@ class H5PlotGUI(QDialog):
     def plot_waterfall(self, labels=('x-axis', 'y-axis')):
         """ Show a two-dimensional waterfall plot of time vs. frequency.
         """
+        if ('phase_offset') in self.soltab.name:
+            self.logger.info('Phase-offset is scalar and cannot be plotted in 2D.')
         if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name) or ('faraday' in self.soltab.name) or ('tec' in self.soltab.name)):
             self.logger.info('Rotation Measure, clock, faraday or TEC cannot be plotted in 2D!')
             return
@@ -987,6 +990,8 @@ class H5PlotGUI(QDialog):
         plot_window.show()
 
     def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
+        if ('phase_offset') in self.soltab.name:
+            self.logger.info('Phase-offset is scalar and cannot be plotted in 2D.')
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
                          ' for ' + self.solset.name)
         antenna = self.station_picker.currentRow()
@@ -1072,6 +1077,8 @@ def reorder_soltab(st):
     """
     LOGGER.info('Reordering soltab ' + st.name)
     order_old = st.getAxesNames()
+    if ('phase_offset' in st.name):
+        LOGGER.info('Not reordering phase_offset as it is a single number.')
     if ('rotationmeasure' in st.name) or ('RMextract'in st.name) or ('clock' in st.name) or ('faraday' in st.name) or ('tec' in st.name and 'freq' not in order_old):
         order_new = ['time', 'ant']
     else:
@@ -1080,8 +1087,11 @@ def reorder_soltab(st):
         order_new += ['pol']
     if 'dir' in order_old:
         order_new += ['dir']
+    t1 = time.time()
     reordered = reorderAxes(st.getValues()[0], order_old, order_new)
     reordered_weights = reorderAxes(st.getValues(weight=True)[0], order_old, order_new)
+    t2 = time.time()
+    LOGGER.info('Reordering took {:f} seconds'.format(t2 - t1))
     reordered2 = {}
     for k in order_new:
         reordered2[k] = st.axes[k]
@@ -1127,6 +1137,10 @@ if __name__ == '__main__':
     LOGFILEH.setLevel(logging.DEBUG)
     LOGFILEH.setFormatter(formatter)
     LOGGER.addHandler(LOGFILEH)
+    LOGSTREAM = logging.StreamHandler()
+    LOGSTREAM.setLevel(logging.DEBUG)
+    LOGSTREAM.setFormatter(formatter)
+    LOGGER.addHandler(LOGSTREAM)
 
     LOGGER.info('Successfully opened %s', args.FILENAME)
 
