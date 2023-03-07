@@ -14,10 +14,6 @@ H5plot is a small GUI to view the solutions in an H5parm interactively. To run i
 
     python h5plot <h5parm>
 
-or, when using the Singularity image,
-
-    singularity run h5plot.simg <h5parm>
-
 This package is also installable through pip:
 
     pip install --upgrade https://github.com/revoltek/losoto/archive/master.zip
@@ -41,5 +37,3 @@ These can be installed on Ubuntu through
     apt-get install qt5-default libgl1-mesa-glx
     pip install pyqt5 matplotlib
     pip install --upgrade https://github.com/revoltek/losoto/archive/master.zip
-
-A specific Python 2 version will _not_ be released, as it will reach end of life January 1st, 2020. It might work, if the dependencies are there, but your mileage may vary and no official support will be given.

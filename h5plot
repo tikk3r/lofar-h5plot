@@ -391,7 +391,7 @@ class GraphWindow(QDialog):
 
         self.layout = QVBoxLayout()
         self.layout.addWidget(self.toolbar)
-        self.layout.addWidget(self.canvas)
+        self.layout.addWidget(self.canvas, stretch=500)
         self.layout.addItem(self.buttons)
         self.layout.addWidget(antiter_widget)
         self.setLayout(self.layout)
@@ -650,7 +650,7 @@ class GraphWindow2D(QDialog):
 
         self.layout = QVBoxLayout()
         self.layout.addWidget(self.toolbar)
-        self.layout.addWidget(self.canvas)
+        self.layout.addWidget(self.canvas, stretch=500)
         self.layout.addItem(self.buttons)
         self.layout.addWidget(antiter_widget)
         self.setLayout(self.layout)
