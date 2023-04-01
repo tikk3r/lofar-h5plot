@@ -741,10 +741,40 @@ class GraphWindow2D(QDialog):
             self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s}'.format(self.polarizations[self.polslot], self.direction))
         else:
             self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s}'.format(self.direction))
+        tdiff = np.diff(xaxis)
+        fdiff = np.diff(yaxis)
+        solint_time = tdiff[0]
+        solint_freq = fdiff[0]
+        vals = zaxis.copy()
+        plot_x = xaxis.copy()
+        plot_y = yaxis.copy()
+
+        if not np.all(np.diff(yaxis) == np.diff(yaxis)[0]): # if not evenly spaced
+            self.LOGGER.info('Found irregular frequency axis, padding gaps with NaNs...')
+            gapidx = np.nanargmax(np.abs(np.diff(plot_y)) > 2*solint_freq)  # index BEFORE the gap
+            gapsize = plot_y[gapidx+1] - plot_y[gapidx]
+            y_spacing = solint_freq
+            while (gapsize >= 2*y_spacing) and (len(plot_y) <= yaxis[-1] / solint_freq):
+                vals = np.insert(vals, gapidx+1, np.nan * np.ones((int(gapsize / y_spacing),len(vals[0]))), axis=1)  # fill gap with NaNs
+                plot_y = np.insert(plot_y, gapidx + 1, np.arange(plot_y[gapidx], plot_y[gapidx + 1], solint_freq))  # fill gap with NaNs
+                gapidx = np.nanargmax(np.abs(np.diff(plot_y)) >= 2*solint_freq)  # index BEFORE the gap
+                gapsize = np.abs(plot_y[gapidx+1] - plot_y[gapidx])
+
+        if not np.all(np.diff(xaxis) == np.diff(xaxis)[0]): # if not evenly spaced
+            self.LOGGER.info('Found irregular time axis, padding gaps with NaNs...')
+            gapidx = np.nanargmax(np.abs(np.diff(plot_x)) > 2*solint_time)  # index BEFORE the gap
+            gapsize = plot_x[gapidx+1] - plot_x[gapidx]
+            x_spacing = solint_time
+            while (gapsize >= 2*x_spacing) and (len(plot_x) <= xaxis[-1] / solint_time): # if gap greater 2 times y-spacing, pad NaNs
+                # print('Padding gaps with', int(gapsize / x_spacing), 'entries')
+                vals = np.insert(vals, gapidx + 1, np.nan * np.ones((int(gapsize / x_spacing), len(vals[1]))), axis=0)  # fill gap with NaNs
+                plot_x = np.insert(plot_x, gapidx + 1, np.arange(plot_x[gapidx], plot_x[gapidx + 1], solint_time))  # fill gap with NaNs
+                gapidx = np.nanargmax(np.abs(np.diff(plot_x)) >= 2*solint_time)  # index BEFORE the gap
+                gapsize = np.abs(plot_x[gapidx+1] - plot_x[gapidx])
         if isphase:
             current_cmap = matplotlib.cm.get_cmap('jet')
             current_cmap.set_bad(color='w')
-            im = self.ax.imshow(zaxis.T, interpolation='none', extent=[xaxis[0], xaxis[-1], yaxis[0], yaxis[-1]], aspect='auto', cmap=current_cmap, origin='lower')
+            im = self.ax.imshow(vals.T, interpolation='none', extent=[plot_x[0], plot_x[-1], yaxis[0], yaxis[-1]], aspect='auto', cmap=current_cmap, origin='lower')
             im.set_clim(-np.pi, np.pi)
         else:
             current_cmap = matplotlib.cm.get_cmap('viridis')
@@ -869,6 +899,7 @@ class H5PlotGUI(QDialog):
         layout.addRow(plot_layout)
         layout.addRow(self.plot_button)
         layout.addRow(self.station_picker)
+
 
     def _axis_picker_event(self):
         """Callback function for when the x-axis is changed.
