@@ -434,7 +434,6 @@ class GraphWindow(QDialog):
         diridx = self.parent.directions.index(self.direction)
         x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx)
         self.frametitle = self.parent.stations[self.antindex]
-        self.frametitle = self.parent.stations[self.antindex]
         self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
         self.setWindowTitle(self.frametitle)
 
@@ -443,6 +442,7 @@ class GraphWindow(QDialog):
 
         When pressed, the abscissa is advanced one position, showing the next time or frequency slot.
         """
+        import time
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
@@ -452,6 +452,7 @@ class GraphWindow(QDialog):
                 self.button_prev.setEnabled(True)
             if self.freqslot == (len(self.frequencies) - 1):
                 self.button_next.setEnabled(False)
+                
         elif 'freq' in self.xlabel.lower():
             self.timeslot += 1
             self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
@@ -601,10 +602,10 @@ class GraphWindow2D(QDialog):
             pass
 
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        # self.LOGFILEH = logging.FileHandler('h5plot.log')
-        # self.LOGFILEH.setLevel(logging.DEBUG)
-        # self.LOGFILEH.setFormatter(formatter)
-        # self.LOGGER.addHandler(LOGFILEH)
+        self.LOGFILEH = logging.FileHandler('h5plot.log')
+        self.LOGFILEH.setLevel(logging.DEBUG)
+        self.LOGFILEH.setFormatter(formatter)
+        self.LOGGER.addHandler(LOGFILEH)
 
         self.setWindowTitle(frametitle)
 
@@ -710,7 +711,7 @@ class GraphWindow2D(QDialog):
         self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
         diridx = self.parent.directions.index(self.direction)
         x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
 
     def _backward_button_event(self):
         """ An event triggered by pressing the "Back" button of a GraphWindow.
@@ -726,7 +727,7 @@ class GraphWindow2D(QDialog):
         self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
         diridx = self.parent.directions.index(self.direction)
         x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
 
     def plot(self, xaxis, yaxis, zaxis, frametitle='', limits=[None, None], ax_labels=['', ''], multidim=False, isphase=False):
         self.xlabel = ax_labels[0]
