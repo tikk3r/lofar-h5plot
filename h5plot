@@ -606,7 +606,7 @@ class GraphWindow(QDialog):
 class GraphWindow2D(QDialog):
     """ A window displaying the plotted 2D quantity. Allows the user to cycle through antenna.
     """
-    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, polslot=0, direction=0, times=None, freqs=None, pols=None, parent=None):
+    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, polslot=0, direction=0, times=None, freqs=None, pols=None, parent=None, mode='values'):
         """ Initialize a new GraphWindow instance.
 
         Args:
@@ -637,6 +637,7 @@ class GraphWindow2D(QDialog):
         self.refantindex = refantindex
         self.st = st
         self.parent = parent
+        self.mode = mode
         try:
             self.polarizations = pols
         except AttributeError:
@@ -737,7 +738,10 @@ class GraphWindow2D(QDialog):
         diridx = self.parent.directions.index(self.direction)
         x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
         self.frametitle = self.parent.stations[self.antindex]
-        self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.frametitle)
+        if self.mode == 'values':
+            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        elif self.mode == 'weights':
+            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
         self.setWindowTitle(self.frametitle)
 
     def _antiter_prev_button_event(self):
@@ -748,7 +752,10 @@ class GraphWindow2D(QDialog):
         diridx = self.parent.directions.index(self.direction)
         x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
         self.frametitle = self.parent.stations[self.antindex]
-        self.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.frametitle)
+        if self.mode == 'values':
+            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        elif self.mode == 'weights':
+            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
         self.setWindowTitle(self.frametitle)
 
     def _forward_button_event(self):
@@ -765,7 +772,10 @@ class GraphWindow2D(QDialog):
         self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
         diridx = self.parent.directions.index(self.direction)
         x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        if self.mode == 'values':
+            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        elif self.mode == 'weights':
+            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
 
     def _backward_button_event(self):
         """ An event triggered by pressing the "Back" button of a GraphWindow.
@@ -781,7 +791,10 @@ class GraphWindow2D(QDialog):
         self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
         diridx = self.parent.directions.index(self.direction)
         x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        if self.mode == 'values':
+            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        elif self.mode == 'weights':
+            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
 
     def plot(self, xaxis, yaxis, zaxis, frametitle='', limits=[None, None], ax_labels=['', ''], multidim=False, isphase=False):
         self.xlabel = ax_labels[0]
@@ -832,7 +845,7 @@ class GraphWindow2D(QDialog):
         else:
             current_cmap = matplotlib.cm.get_cmap('viridis')
             current_cmap.set_bad(color='w')
-            im = self.ax.imshow(zaxis.T, interpolation='none', extent=[plot_x[0], plot_x[-1], plot_y[0], plot_y[-1]], aspect='auto', cmap=current_cmap, origin='lower')
+            im = self.ax.imshow(vals.T, interpolation='none', extent=[plot_x[0], plot_x[-1], plot_y[0], plot_y[-1]], aspect='auto', cmap=current_cmap, origin='lower')
         cb = self.fig.colorbar(im)
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         self.canvas.draw()
@@ -1107,7 +1120,11 @@ class H5PlotGUI(QDialog):
             plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode)
         self.figures.append(plot_window)
         z[zw == 0] = np.nan
-        plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
+        print('PLOTTING IN MODE ' + mode)
+        if mode == 'values':
+            plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
+        elif mode == 'weights':
+            plot_window.plot(x, y, zw, ax_labels=('Time [s]', 'Freq. [MHz]'), frametitle=self.stations[antenna])
         plot_window.show()
 
     def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None]), mode='values'):
