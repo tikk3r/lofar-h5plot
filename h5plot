@@ -543,6 +543,10 @@ class GraphWindow(QDialog):
             # Start counting from t=0
             xaxis = xaxis - xaxis[0]
         self.ax.set_title(frametitle + ' - {:s}'.format(self.direction))
+        if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+            self.ax.set_title(frametitle + ' - {:s} time diff'.format(self.direction))
+        if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+            self.ax.set_title(frametitle + ' - {:s} frequency diff'.format(self.direction))
         if self.ax.get_legend_handles_labels()[1]:
             self.ax.legend()
         if type(xaxis) is list:
@@ -570,8 +574,6 @@ class GraphWindow(QDialog):
                         if i == 0:
                             xaxis = xaxis[:-1]
                         vw = vw[:-1]
-                    print(v_m.shape)
-                    print(xaxis.shape)
                     self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
                     self.ax.plot(xaxis, v_m, 'h', label=plot_labels[i], color='C' + str(i))
                     if np.ma.is_masked(v_m):
@@ -608,7 +610,6 @@ class GraphWindow(QDialog):
         else:
             if self.mode == 'values':
                 v = yaxis
-                print(v.shape)
                 vw = yaxis_weight
                 v_m = np.ma.masked_where(yaxis_weight == 0, v)
                 if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
@@ -839,6 +840,12 @@ class GraphWindow2D(QDialog):
         yaxis = yaxis * 1e-6
         if self.polarizations is not None:
             self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s}'.format(self.polarizations[self.polslot], self.direction))
+            if self.parent.check_tdiff.isChecked() and not self.parent.check_fdiff.isChecked():
+                self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} time diff'.format(self.polarizations[self.polslot], self.direction))
+            if not self.parent.check_tdiff.isChecked() and self.parent.check_fdiff.isChecked():
+                self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} frequency diff'.format(self.polarizations[self.polslot], self.direction))
+            if self.parent.check_tdiff.isChecked() and self.parent.check_fdiff.isChecked():
+                self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} time and frequency diff'.format(self.polarizations[self.polslot], self.direction))
         else:
             self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s}'.format(self.direction))
         tdiff = np.diff(xaxis)
