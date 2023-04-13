@@ -7,7 +7,7 @@ import signal
 import sys
 import time
 
-from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
+from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
     QListWidget, QPushButton, QScrollBar, QVBoxLayout, QWidget
 from PyQt5 import QtCore, QtWidgets
 
@@ -286,7 +286,7 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
 class GraphWindow(QDialog):
     """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
     """
-    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, timeslot=0, freqslot=0, direction=0, times=None, freqs=None, parent=None):
+    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, timeslot=0, freqslot=0, direction=0, times=None, freqs=None, parent=None, mode='values'):
         """ Initialize a new GraphWindow instance.
 
         Args:
@@ -318,6 +318,7 @@ class GraphWindow(QDialog):
         self.refantindex = refantindex
         self.st = st
         self.parent = parent
+        self.mode = mode
         try:
             self.frequencies = freqs
         except AttributeError:
@@ -529,6 +530,7 @@ class GraphWindow(QDialog):
         self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
     def plot(self, xaxis, yaxis, yaxis_weight, frametitle='', limits=[None, None], ax_labels=['', ''], plot_labels=[], multidim=False, isphase=False):
+        print('PLOTTING IN MODE ' + self.mode)
         self.xlabel = ax_labels[0]
         self.ylabel = ax_labels[1]
         self.xlabelp = plot_labels[0]
@@ -552,34 +554,49 @@ class GraphWindow(QDialog):
             yaxis_weight[np.isnan(yaxis)] = 0
         if len(yaxis.shape) > 1 and len(plot_labels) != 0:
             for i in range(yaxis.shape[0]):
-                v = yaxis[i, :]
-                self.ax.plot(xaxis, v, '--', alpha=0.25, color='C' + str(i))
-                self.ax.plot(xaxis, v, 'h', label=plot_labels[i], color='C' + str(i))
-                # Handle flagged data. Weights are polarization independent.
-                vw = yaxis_weight[i, :]
-                v_m = np.ma.masked_where(vw == 0, v)
-                if np.ma.is_masked(v_m):
-                    for x in xaxis[vw==0]:
-                        self.ax.axvline(x, color='r')
-                    self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
+                if self.mode == 'values':
+                    v = yaxis[i, :]
+                    self.ax.plot(xaxis, v, '--', alpha=0.25, color='C' + str(i))
+                    self.ax.plot(xaxis, v, 'h', label=plot_labels[i], color='C' + str(i))
+                    # Handle flagged data. Weights are polarization independent.
+                    vw = yaxis_weight[i, :]
+                    v_m = np.ma.masked_where(vw == 0, v)
+                    if np.ma.is_masked(v_m):
+                        for x in xaxis[vw==0]:
+                            self.ax.axvline(x, color='r')
+                        self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
+                elif self.mode == 'weights':
+                    vw = yaxis_weight[i, :]
+                    self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C' + str(i))
+                    self.ax.plot(xaxis, vw, 'h', label=plot_labels[i], color='C' + str(i))
             self.ax.legend()
         elif len(yaxis.shape) > 1 and len(plot_labels) == 0:
             for i in range(yaxis.shape[0]):
-                v = yaxis[i, :]
-                vw = yaxis_weight[i, :]
-                v_m = np.ma.masked_where(yaxis_weight == 0, v)
-                self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
-                self.ax.plot(xaxis, v_m, 'h', color='C' + str(i))
+                if self.mode == 'values':
+                    v = yaxis[i, :]
+                    vw = yaxis_weight[i, :]
+                    v_m = np.ma.masked_where(yaxis_weight == 0, v)
+                    self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
+                    self.ax.plot(xaxis, v_m, 'h', color='C' + str(i))
+                elif self.mode == 'weights':
+                    vw = yaxis_weight[i, :]
+                    self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C' + str(i))
+                    self.ax.plot(xaxis, vw, 'h', label=plot_labels[i], color='C' + str(i))
         else:
-            v = yaxis
-            self.ax.plot(xaxis, v, '--', alpha=0.25, color='C0')
-            self.ax.plot(xaxis, v, 'h', color='C0')
-            vw = yaxis_weight
-            v_m = np.ma.masked_where(yaxis_weight == 0, v)
-            if np.ma.is_masked(v_m):
-                for x in xaxis[vw==0]:
-                    self.ax.axvline(x, color='r')
-                self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
+            if self.mode == 'values':
+                v = yaxis
+                self.ax.plot(xaxis, v, '--', alpha=0.25, color='C0')
+                self.ax.plot(xaxis, v, 'h', color='C0')
+                vw = yaxis_weight
+                v_m = np.ma.masked_where(yaxis_weight == 0, v)
+                if np.ma.is_masked(v_m):
+                    for x in xaxis[vw==0]:
+                        self.ax.axvline(x, color='r')
+                    self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')   
+            elif self.mode == 'weights':
+                    vw = yaxis_weight
+                    self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C0')
+                    self.ax.plot(xaxis, vw, 'h', label=plot_labels, color='C0')
         if isphase:
             self.ax.set_ylim(-np.pi, np.pi)
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
@@ -936,6 +953,12 @@ class H5PlotGUI(QDialog):
         self.dir_picker.addItems(self.directions)
         self.dir_picker.activated.connect(self._dir_picker_event)
 
+        self.checkbox_layout = QGridLayout()
+        self.check_weights = QCheckBox('Plot weights')
+        self.check_weights.toggled.connect(self._weight_picker_event)
+        self.checkbox_layout.addWidget(self.check_weights)
+        self.plotmode = 'values'
+
         self.plot_button = QPushButton('Plot')
         self.plot_button.clicked.connect(self._plot_button_event)
 
@@ -956,6 +979,7 @@ class H5PlotGUI(QDialog):
         layout = QFormLayout(self)
         layout.addRow(self.solset_label, self.solset_picker)
         layout.addRow(plot_layout)
+        layout.addRow(self.checkbox_layout)
         layout.addRow(self.plot_button)
         layout.addRow(self.station_picker)
 
@@ -1043,11 +1067,18 @@ class H5PlotGUI(QDialog):
         """
         self.logger.debug('Plotting button pressed.')
         if self.axis == 'freq' or self.axis == 'time':
-            self.plot(labels=(self.axis, self.soltab.name))
+            self.plot(labels=(self.axis, self.soltab.name), mode=self.plotmode)
         elif self.axis == 'waterfall':
-            self.plot_waterfall(labels=('time', 'freq'))
+            self.plot_waterfall(labels=('time', 'freq'), mode=self.plotmode)
 
-    def plot_waterfall(self, labels=('x-axis', 'y-axis')):
+    def _weight_picker_event(self):
+        if self.check_weights.isChecked():
+            self.plotmode = 'weights'
+        else:
+            self.plotmode = 'values'
+        self.logger.info('Plotting {:s}'.format(self.plotmode))
+
+    def plot_waterfall(self, labels=('x-axis', 'y-axis'), mode='values'):
         """ Show a two-dimensional waterfall plot of time vs. frequency.
         """
         if ('phase_offset') in self.soltab.name:
@@ -1070,16 +1101,16 @@ class H5PlotGUI(QDialog):
             self.logger.info('Either time or frequency has only 1 entry, not plotting!')
             return
         try:
-            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction])
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode)
         except AttributeError:
             # No polarizations most likely.
-            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction])
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode)
         self.figures.append(plot_window)
         z[zw == 0] = np.nan
         plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
         plot_window.show()
 
-    def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None])):
+    def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None]), mode='values'):
         if ('phase_offset') in self.soltab.name:
             self.logger.info('Phase-offset is scalar and cannot be plotted in 2D.')
         self.logger.info('Plotting ' + self.soltab.name + ' vs ' + self.axis + \
@@ -1095,10 +1126,10 @@ class H5PlotGUI(QDialog):
             # Requested combination not supported.
             return
         if 'freq' in self.soltab.getAxesNames():
-            plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self, direction=self.directions[self.direction])
+            plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self, direction=self.directions[self.direction], mode=mode)
         else:
             # Probably TEC or another solution type with no frequency axis.
-            plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction])
+            plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction], mode=mode)
         self.figures.append(plot_window)
         plot_window.plot(x_axis, Y_AXIS, Y_AXIS_WEIGHT, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
