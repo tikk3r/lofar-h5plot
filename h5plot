@@ -8,7 +8,7 @@ import sys
 import time
 
 from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
-    QListWidget, QPushButton, QVBoxLayout, QWidget
+    QListWidget, QPushButton, QScrollBar, QVBoxLayout, QWidget
 from PyQt5 import QtCore, QtWidgets
 
 from losoto.lib_operations import reorderAxes
@@ -385,6 +385,16 @@ class GraphWindow(QDialog):
         self.buttons.addWidget(self.select_label, 0, 1)
         self.buttons.addWidget(self.button_next, 0, 2)
 
+        self.scrolls = QGridLayout()
+        self.scrollbar = QScrollBar()
+        self.scrollbar.setOrientation(QtCore.Qt.Horizontal)
+        if 'time' in axis.lower():
+            self.scrollbar.setRange(0, len(self.frequencies)-1)
+        elif 'freq' in axis.lower():
+            self.scrollbar.setRange(0, len(self.times)-1)
+        self.scrollbar.valueChanged.connect(self._scrollbar_event)
+        self.scrolls.addWidget(self.scrollbar, 0, 0)
+
         self.fig = Figure()
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
@@ -393,6 +403,7 @@ class GraphWindow(QDialog):
         self.layout.addWidget(self.toolbar)
         self.layout.addWidget(self.canvas, stretch=500)
         self.layout.addItem(self.buttons)
+        self.layout.addItem(self.scrolls)
         self.layout.addWidget(antiter_widget)
         self.setLayout(self.layout)
 
@@ -442,7 +453,6 @@ class GraphWindow(QDialog):
 
         When pressed, the abscissa is advanced one position, showing the next time or frequency slot.
         """
-        import time
         if 'time' in self.xlabel.lower():
             self.freqslot += 1
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
@@ -452,6 +462,7 @@ class GraphWindow(QDialog):
                 self.button_prev.setEnabled(True)
             if self.freqslot == (len(self.frequencies) - 1):
                 self.button_next.setEnabled(False)
+            self.scrollbar.setValue(self.freqslot)
                 
         elif 'freq' in self.xlabel.lower():
             self.timeslot += 1
@@ -462,6 +473,7 @@ class GraphWindow(QDialog):
                 self.button_prev.setEnabled(True)
             if self.timeslot == (len(self.times) - 1):
                 self.button_next.setEnabled(False)
+            self.scrollbar.setValue(self.timeslot)
         self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
     def _backward_button_event(self):
@@ -479,6 +491,7 @@ class GraphWindow(QDialog):
                     self.button_prev.setEnabled(False)
                 if (self.freqslot < (len(self.frequencies) - 1)) and (not self.button_next.isEnabled()):
                     self.button_next.setEnabled(True)
+                self.scrollbar.setValue(self.freqslot)
         elif 'freq' in self.xlabel.lower():
             if self.timeslot > 0:
                 self.timeslot -= 1
@@ -489,6 +502,30 @@ class GraphWindow(QDialog):
                     self.button_prev.setEnabled(False)
                 if (self.timeslot < (len(self.parent.times) - 1)) and (not self.button_next.isEnabled()):
                     self.button_next.setEnabled(True)
+                self.scrollbar.setValue(self.timeslot)
+        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+
+    def _scrollbar_event(self):
+        print(self.scrollbar.value())
+        if 'time' in self.xlabel.lower():
+            self.freqslot = self.scrollbar.value()
+            self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
+            diridx = self.parent.directions.index(self.direction)
+            x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx)
+            if (self.freqslot > 0) and (not self.button_prev.isEnabled()):
+                self.button_prev.setEnabled(True)
+            if self.freqslot == (len(self.frequencies) - 1):
+                self.button_next.setEnabled(False)
+                
+        elif 'freq' in self.xlabel.lower():
+            self.timeslot = self.scrollbar.value()
+            self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
+            diridx = self.parent.directions.index(self.direction)
+            x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, direction=diridx)
+            if self.timeslot < (len(self.times) - 1) and (not self.button_prev.isEnabled()):
+                self.button_prev.setEnabled(True)
+            if self.timeslot == (len(self.times) - 1):
+                self.button_next.setEnabled(False)
         self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
     def plot(self, xaxis, yaxis, yaxis_weight, frametitle='', limits=[None, None], ax_labels=['', ''], plot_labels=[], multidim=False, isphase=False):
