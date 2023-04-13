@@ -9,7 +9,7 @@ import time
 
 from PyQt5.QtWidgets import QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
     QListWidget, QPushButton, QVBoxLayout, QWidget
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtWidgets
 
 from losoto.lib_operations import reorderAxes
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -784,6 +784,29 @@ class GraphWindow2D(QDialog):
         self.canvas.draw()
 
 
+class ListWidget(QListWidget):
+    """ Version of QListWidget that resizes itself.
+    
+    https://stackoverflow.com/questions/63497841/qlistwidget-does-not-resize-itself
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
+
+
+    def minimumSizeHint(self) -> QtCore.QSize:
+        return QtCore.QSize(-1, -1)
+
+
+    def viewportSizeHint(self) -> QtCore.QSize:
+        if self.model().rowCount() == 0:
+            return QtCore.QSize(self.width(), 0)
+        height = sum(self.sizeHintForRow(i) for i in range(self.count()) if not self.item(i).isHidden())
+        width = super().viewportSizeHint().width()
+        return QtCore.QSize(width, height)
+
+
 class H5PlotGUI(QDialog):
     """The main GUI for H5Plot.
 
@@ -879,7 +902,7 @@ class H5PlotGUI(QDialog):
         self.plot_button = QPushButton('Plot')
         self.plot_button.clicked.connect(self._plot_button_event)
 
-        self.station_picker = QListWidget()
+        self.station_picker = ListWidget()
         self.station_picker.addItems(self.stations)
         self.station_picker.setCurrentRow(0)
 
