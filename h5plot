@@ -389,10 +389,12 @@ class GraphWindow(QDialog):
         self.scrolls = QGridLayout()
         self.scrollbar = QScrollBar()
         self.scrollbar.setOrientation(QtCore.Qt.Horizontal)
-        if 'time' in axis.lower():
+        if 'time' in axis.lower() and self.frequencies is not None:
             self.scrollbar.setRange(0, len(self.frequencies)-1)
-        elif 'freq' in axis.lower():
+        elif 'freq' in axis.lower()  and self.times is not None:
             self.scrollbar.setRange(0, len(self.times)-1)
+        else:
+            self.scrollbar.setDisabled(True)
         self.scrollbar.valueChanged.connect(self._scrollbar_event)
         self.scrolls.addWidget(self.scrollbar, 0, 0)
 
@@ -508,7 +510,7 @@ class GraphWindow(QDialog):
 
     def _scrollbar_event(self):
         print(self.scrollbar.value())
-        if 'time' in self.xlabel.lower():
+        if 'time' in self.xlabel.lower() and len(self.frequencies) > 1:
             self.freqslot = self.scrollbar.value()
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
             diridx = self.parent.directions.index(self.direction)
@@ -530,7 +532,6 @@ class GraphWindow(QDialog):
         self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
     def plot(self, xaxis, yaxis, yaxis_weight, frametitle='', limits=[None, None], ax_labels=['', ''], plot_labels=[], multidim=False, isphase=False):
-        print('PLOTTING IN MODE ' + self.mode)
         self.xlabel = ax_labels[0]
         self.ylabel = ax_labels[1]
         self.xlabelp = plot_labels[0]
@@ -996,7 +997,6 @@ class H5PlotGUI(QDialog):
         layout.addRow(self.plot_button)
         layout.addRow(self.station_picker)
 
-
     def _axis_picker_event(self):
         """Callback function for when the x-axis is changed.
 
@@ -1120,7 +1120,6 @@ class H5PlotGUI(QDialog):
             plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode)
         self.figures.append(plot_window)
         z[zw == 0] = np.nan
-        print('PLOTTING IN MODE ' + mode)
         if mode == 'values':
             plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
         elif mode == 'weights':
