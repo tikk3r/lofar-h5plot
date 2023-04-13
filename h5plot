@@ -838,6 +838,10 @@ class GraphWindow2D(QDialog):
                 plot_x = np.insert(plot_x, gapidx + 1, np.arange(plot_x[gapidx], plot_x[gapidx + 1], solint_time))  # fill gap with NaNs
                 gapidx = np.nanargmax(np.abs(np.diff(plot_x)) >= 2*solint_time)  # index BEFORE the gap
                 gapsize = np.abs(plot_x[gapidx+1] - plot_x[gapidx])
+        if self.parent.check_tdiff.isChecked():
+            vals = np.diff(vals, axis=0)
+        if self.parent.check_fdiff.isChecked():
+            vals = np.diff(vals, axis=1)
         if isphase:
             current_cmap = matplotlib.cm.get_cmap('jet')
             current_cmap.set_bad(color='w')
@@ -969,8 +973,12 @@ class H5PlotGUI(QDialog):
 
         self.checkbox_layout = QGridLayout()
         self.check_weights = QCheckBox('Plot weights')
+        self.check_tdiff = QCheckBox('Plot time difference')
+        self.check_fdiff = QCheckBox('Plot frequency difference')
         self.check_weights.toggled.connect(self._weight_picker_event)
         self.checkbox_layout.addWidget(self.check_weights)
+        self.checkbox_layout.addWidget(self.check_tdiff)
+        self.checkbox_layout.addWidget(self.check_fdiff)
         self.plotmode = 'values'
 
         self.plot_button = QPushButton('Plot')
