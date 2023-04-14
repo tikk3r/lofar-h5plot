@@ -685,7 +685,7 @@ class GraphWindow(QDialog):
 class GraphWindow2D(QDialog):
     """ A window displaying the plotted 2D quantity. Allows the user to cycle through antenna.
     """
-    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, polslot=0, direction=0, times=None, freqs=None, pols=None, parent=None, mode='values'):
+    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, polslot=0, direction=0, times=None, freqs=None, pols=None, parent=None, mode='values', do_timediff=False, do_freqdiff=False, do_poldiff=False):
         """ Initialize a new GraphWindow instance.
 
         Args:
@@ -717,6 +717,9 @@ class GraphWindow2D(QDialog):
         self.st = st
         self.parent = parent
         self.mode = mode
+        self.do_timediff = do_timediff
+        self.do_freqdiff = do_freqdiff
+        self.do_poldiff = do_poldiff
         try:
             self.polarizations = pols
         except AttributeError:
@@ -790,7 +793,7 @@ class GraphWindow2D(QDialog):
         self.layout.addWidget(antiter_widget)
         self.setLayout(self.layout)
 
-        if self.parent.check_pdiff.isChecked():
+        if self.do_poldiff:
             self.button_prev.setEnabled(False)
             self.button_next.setEnabled(False)
             self.select_label.setText('Corr.: {:s} - {:s}'.format(self.polarizations[0], self.polarizations[-1]))
@@ -821,7 +824,7 @@ class GraphWindow2D(QDialog):
         else:
             self.antindex = 0
         diridx = self.parent.directions.index(self.direction)
-        if len(self.polarizations) > 1 and self.parent.check_pdiff.isChecked():
+        if len(self.polarizations) > 1 and self.do_poldiff:
             # Need to plot polarisation difference.
             x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 0, direction=diridx)
             x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, -1, direction=diridx)
@@ -843,7 +846,7 @@ class GraphWindow2D(QDialog):
         else:
             self.antindex = len(self.parent.stations) - 1
         diridx = self.parent.directions.index(self.direction)
-        if len(self.polarizations) > 1 and self.parent.check_pdiff.isChecked():
+        if len(self.polarizations) > 1 and self.do_poldiff:
             # Need to plot polarisation difference.
             x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 0, direction=diridx)
             x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, -1, direction=diridx)
@@ -908,11 +911,11 @@ class GraphWindow2D(QDialog):
         yaxis = yaxis * 1e-6
         if self.polarizations is not None:
             self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s}'.format(self.polarizations[self.polslot], self.direction))
-            if self.parent.check_tdiff.isChecked() and not self.parent.check_fdiff.isChecked():
+            if self.do_timediff and not self.do_freqdiff:
                 self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} time diff'.format(self.polarizations[self.polslot], self.direction))
-            if not self.parent.check_tdiff.isChecked() and self.parent.check_fdiff.isChecked():
+            if not self.do_timediff and self.do_freqdiff:
                 self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} frequency diff'.format(self.polarizations[self.polslot], self.direction))
-            if self.parent.check_tdiff.isChecked() and self.parent.check_fdiff.isChecked():
+            if self.do_timediff and self.do_freqdiff:
                 self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} time and frequency diff'.format(self.polarizations[self.polslot], self.direction))
         else:
             self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s}'.format(self.direction))
@@ -1241,10 +1244,10 @@ class H5PlotGUI(QDialog):
             self.logger.info('Either time or frequency has only 1 entry, not plotting!')
             return
         try:
-            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode)
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
         except AttributeError:
             # No polarizations most likely.
-            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode)
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
         self.figures.append(plot_window)
         z[zw == 0] = np.nan
         if mode == 'values':
