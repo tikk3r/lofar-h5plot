@@ -1237,10 +1237,6 @@ class H5PlotGUI(QDialog):
                     z = z1 - z2
                     # Combine flags of both polarisations.
                     zw = zw1 * zw2
-                    print('WEIGHTS 1')
-                    print(zw1)
-                    print('WEIGTHS 2')
-                    print(zw2)
                 else:
                     x, y, z, zw, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
             else:
@@ -1248,7 +1244,6 @@ class H5PlotGUI(QDialog):
         except ValueError:
             logging.error('Error loading 2D data!')
             return
-        print(zw)
         if (len(x) == 1) or (len(y) == 1):
             self.logger.info('Either time or frequency has only 1 entry, not plotting!')
             return
@@ -1264,8 +1259,6 @@ class H5PlotGUI(QDialog):
         if mode == 'values':
             plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
         elif mode == 'weights':
-            print('PLOTTING 2D WEIGHTS')
-            print(zw)
             plot_window.plot(x, y, zw, ax_labels=('Time [s]', 'Freq. [MHz]'), frametitle=self.stations[antenna])
         plot_window.show()
 
