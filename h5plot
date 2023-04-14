@@ -230,6 +230,7 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
     y_axis = vals[1]['freq']
     values = np.asarray(vals[0])
     plabels = []
+
     try:
         pols = list(vals[1]['pol'])
     except:
@@ -269,7 +270,7 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
         if 'pol' in axes:
             if 'dir' in axes:
                 plotvals = values[:, :, antenna, pol, direction]
-                plotvals_weight = values[:, :, antenna, pol, direction]
+                plotvals_weight = weights[:, :, antenna, pol, direction]
             else:
                 plotvals = values[:, :, antenna, pol]
                 plotvals_weight = weights[:, :, antenna, pol]
@@ -279,7 +280,6 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
         else:
             plotvals = values[:, :, antenna] - values[:, :, refantenna]
             plotvals_weight = weights[:, :, antenna]
-
     return x_axis, y_axis, plotvals, plotvals_weight, isphase
 
 
@@ -1237,6 +1237,10 @@ class H5PlotGUI(QDialog):
                     z = z1 - z2
                     # Combine flags of both polarisations.
                     zw = zw1 * zw2
+                    print('WEIGHTS 1')
+                    print(zw1)
+                    print('WEIGTHS 2')
+                    print(zw2)
                 else:
                     x, y, z, zw, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
             else:
@@ -1244,9 +1248,11 @@ class H5PlotGUI(QDialog):
         except ValueError:
             logging.error('Error loading 2D data!')
             return
+        print(zw)
         if (len(x) == 1) or (len(y) == 1):
             self.logger.info('Either time or frequency has only 1 entry, not plotting!')
             return
+        # print('PLOTTING 2D WEIGHTS')
         try:
             plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
         except AttributeError:
@@ -1254,9 +1260,12 @@ class H5PlotGUI(QDialog):
             plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
         self.figures.append(plot_window)
         z[zw == 0] = np.nan
+        print('MODE IS ' + mode)
         if mode == 'values':
             plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
         elif mode == 'weights':
+            print('PLOTTING 2D WEIGHTS')
+            print(zw)
             plot_window.plot(x, y, zw, ax_labels=('Time [s]', 'Freq. [MHz]'), frametitle=self.stations[antenna])
         plot_window.show()
 
