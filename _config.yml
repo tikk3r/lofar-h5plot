@@ -1,0 +1,18 @@
+title: H5plot
+description: Interactive GUI plotter for LOFAR H5parm solutions.
+remote_theme: just-the-docs/just-the-docs
+
+url: https://tikk3r.github.io/lofar-h5plot/
+baseurl: /lofar-h5plot
+
+
+callouts:
+  warning:
+    title: Warning
+    color: red
+  important:
+    title: Important
+    color: blue
+
+aux_links:
+  Source code on GitHub: https://github.com/tikk3r/lofar-h5plot/
