@@ -286,7 +286,7 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
 class GraphWindow(QDialog):
     """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
     """
-    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, timeslot=0, freqslot=0, direction=0, times=None, freqs=None, parent=None, mode='values'):
+    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, timeslot=0, freqslot=0, direction=0, times=None, freqs=None, parent=None, mode='values', do_timediff=False, do_freqdiff=False, do_poldiff=False):
         """ Initialize a new GraphWindow instance.
 
         Args:
@@ -319,6 +319,9 @@ class GraphWindow(QDialog):
         self.st = st
         self.parent = parent
         self.mode = mode
+        self.do_timediff = do_timediff
+        self.do_freqdiff = do_freqdiff
+        self.do_poldiff = do_poldiff
         try:
             self.frequencies = freqs
         except AttributeError:
@@ -509,7 +512,6 @@ class GraphWindow(QDialog):
         self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
 
     def _scrollbar_event(self):
-        print(self.scrollbar.value())
         if 'time' in self.xlabel.lower() and len(self.frequencies) > 1:
             self.freqslot = self.scrollbar.value()
             self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
@@ -543,9 +545,9 @@ class GraphWindow(QDialog):
             # Start counting from t=0
             xaxis = xaxis - xaxis[0]
         self.ax.set_title(frametitle + ' - {:s}'.format(self.direction))
-        if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+        if 'time' in ax_labels[0] and self.do_timediff:
             self.ax.set_title(frametitle + ' - {:s} time diff'.format(self.direction))
-        if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+        if 'freq' in ax_labels[0] and self.do_freqdiff:
             self.ax.set_title(frametitle + ' - {:s} frequency diff'.format(self.direction))
         if self.ax.get_legend_handles_labels()[1]:
             self.ax.legend()
@@ -558,21 +560,19 @@ class GraphWindow(QDialog):
             # Set weights to 0 for NaN solutions.
             yaxis_weight[np.isnan(yaxis)] = 0
         if len(yaxis.shape) > 1 and len(plot_labels) != 0:
-            if self.parent.check_pdiff.isChecked():
+            if self.do_poldiff:
                 # Need to plot polarisation difference.
                 v = yaxis[0, :] - yaxis[-1, :]
                 # Handle flagged data. Weights are polarization independent.
                 vw = yaxis_weight[0, :]
                 v_m = np.ma.masked_where(vw == 0, v)
-                if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+                if 'time' in ax_labels[0] and self.do_timediff:
                     v_m = np.ma.diff(v_m, axis=0)
-                    if i == 0:
-                        xaxis = xaxis[:-1]
+                    xaxis = xaxis[:-1]
                     vw = vw[:-1]
-                if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+                if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
-                    if i == 0:
-                        xaxis = xaxis[:-1]
+                    xaxis = xaxis[:-1]
                     vw = vw[:-1]
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
@@ -587,12 +587,12 @@ class GraphWindow(QDialog):
                         # Handle flagged data. Weights are polarization independent.
                         vw = yaxis_weight[i, :]
                         v_m = np.ma.masked_where(vw == 0, v)
-                        if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+                        if 'time' in ax_labels[0] and self.do_timediff:
                             v_m = np.ma.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
-                        if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+                        if 'freq' in ax_labels[0] and self.do_freqdiff:
                             v_m = np.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
@@ -609,18 +609,18 @@ class GraphWindow(QDialog):
                         self.ax.plot(xaxis, vw, 'h', label=plot_labels[i], color='C' + str(i))
             self.ax.legend()
         elif len(yaxis.shape) > 1 and len(plot_labels) == 0:
-            if self.parent.check_pdiff.isChecked():
+            if self.do_poldiff:
                 # Need to plot polarisation difference.
                 v = yaxis[0, :] - yaxis[-1, :]
                 # Handle flagged data. Weights are polarization independent.
                 vw = yaxis_weight[0, :]
                 v_m = np.ma.masked_where(vw == 0, v)
-                if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+                if 'time' in ax_labels[0] and self.do_timediff:
                     v_m = np.ma.diff(v_m, axis=0)
                     if i == 0:
                         xaxis = xaxis[:-1]
                     vw = vw[:-1]
-                if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+                if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     if i == 0:
                         xaxis = xaxis[:-1]
@@ -637,12 +637,12 @@ class GraphWindow(QDialog):
                         v = yaxis[i, :]
                         vw = yaxis_weight[i, :]
                         v_m = np.ma.masked_where(yaxis_weight == 0, v)
-                        if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+                        if 'time' in ax_labels[0] and self.do_timediff:
                             v_m = np.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
-                        if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+                        if 'freq' in ax_labels[0] and self.do_freqdiff:
                             v_m = np.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
@@ -658,11 +658,11 @@ class GraphWindow(QDialog):
                 v = yaxis
                 vw = yaxis_weight
                 v_m = np.ma.masked_where(yaxis_weight == 0, v)
-                if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+                if 'time' in ax_labels[0] and self.do_timediff:
                     v_m = np.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
-                if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+                if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
@@ -1276,10 +1276,10 @@ class H5PlotGUI(QDialog):
             # Requested combination not supported.
             return
         if 'freq' in self.soltab.getAxesNames():
-            plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self, direction=self.directions[self.direction], mode=mode)
+            plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
         else:
             # Probably TEC or another solution type with no frequency axis.
-            plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction], mode=mode)
+            plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
         self.figures.append(plot_window)
         plot_window.plot(x_axis, Y_AXIS, Y_AXIS_WEIGHT, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
