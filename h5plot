@@ -558,55 +558,101 @@ class GraphWindow(QDialog):
             # Set weights to 0 for NaN solutions.
             yaxis_weight[np.isnan(yaxis)] = 0
         if len(yaxis.shape) > 1 and len(plot_labels) != 0:
-            for i in range(yaxis.shape[0]):
-                if self.mode == 'values':
-                    v = yaxis[i, :]
-                    # Handle flagged data. Weights are polarization independent.
-                    vw = yaxis_weight[i, :]
-                    v_m = np.ma.masked_where(vw == 0, v)
-                    if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
-                        v_m = np.ma.diff(v_m, axis=0)
-                        if i == 0:
-                            xaxis = xaxis[:-1]
-                        vw = vw[:-1]
-                    if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
-                        v_m = np.diff(v_m, axis=0)
-                        if i == 0:
-                            xaxis = xaxis[:-1]
-                        vw = vw[:-1]
-                    self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
-                    self.ax.plot(xaxis, v_m, 'h', label=plot_labels[i], color='C' + str(i))
-                    if np.ma.is_masked(v_m):
-                        for x in xaxis[vw==0]:
-                            self.ax.axvline(x, color='r')
-                        self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
-                elif self.mode == 'weights':
-                    vw = yaxis_weight[i, :]
-                    self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C' + str(i))
-                    self.ax.plot(xaxis, vw, 'h', label=plot_labels[i], color='C' + str(i))
+            if self.parent.check_pdiff.isChecked():
+                # Need to plot polarisation difference.
+                v = yaxis[0, :] - yaxis[-1, :]
+                # Handle flagged data. Weights are polarization independent.
+                vw = yaxis_weight[0, :]
+                v_m = np.ma.masked_where(vw == 0, v)
+                if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+                    v_m = np.ma.diff(v_m, axis=0)
+                    if i == 0:
+                        xaxis = xaxis[:-1]
+                    vw = vw[:-1]
+                if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+                    v_m = np.diff(v_m, axis=0)
+                    if i == 0:
+                        xaxis = xaxis[:-1]
+                    vw = vw[:-1]
+                self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
+                self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
+                if np.ma.is_masked(v_m):
+                    for x in xaxis[vw==0]:
+                        self.ax.axvline(x, color='r')
+                    self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
+            else:
+                for i in range(yaxis.shape[0]):
+                    if self.mode == 'values':
+                        v = yaxis[i, :]
+                        # Handle flagged data. Weights are polarization independent.
+                        vw = yaxis_weight[i, :]
+                        v_m = np.ma.masked_where(vw == 0, v)
+                        if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+                            v_m = np.ma.diff(v_m, axis=0)
+                            if i == 0:
+                                xaxis = xaxis[:-1]
+                            vw = vw[:-1]
+                        if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+                            v_m = np.diff(v_m, axis=0)
+                            if i == 0:
+                                xaxis = xaxis[:-1]
+                            vw = vw[:-1]
+                        self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
+                        self.ax.plot(xaxis, v_m, 'h', label=plot_labels[i], color='C' + str(i))
+                        if np.ma.is_masked(v_m):
+                            for x in xaxis[vw==0]:
+                                self.ax.axvline(x, color='r')
+                            self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
+                    elif self.mode == 'weights':
+                        vw = yaxis_weight[i, :]
+                        self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C' + str(i))
+                        self.ax.plot(xaxis, vw, 'h', label=plot_labels[i], color='C' + str(i))
             self.ax.legend()
         elif len(yaxis.shape) > 1 and len(plot_labels) == 0:
-            for i in range(yaxis.shape[0]):
-                if self.mode == 'values':
-                    v = yaxis[i, :]
-                    vw = yaxis_weight[i, :]
-                    v_m = np.ma.masked_where(yaxis_weight == 0, v)
-                    if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
-                        v_m = np.diff(v_m, axis=0)
-                        if i == 0:
-                            xaxis = xaxis[:-1]
-                        vw = vw[:-1]
-                    if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
-                        v_m = np.diff(v_m, axis=0)
-                        if i == 0:
-                            xaxis = xaxis[:-1]
-                        vw = vw[:-1]
-                    self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
-                    self.ax.plot(xaxis, v_m, 'h', color='C' + str(i))
-                elif self.mode == 'weights':
-                    vw = yaxis_weight[i, :]
-                    self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C' + str(i))
-                    self.ax.plot(xaxis, vw, 'h', label=plot_labels[i], color='C' + str(i))
+            if self.parent.check_pdiff.isChecked():
+                # Need to plot polarisation difference.
+                v = yaxis[0, :] - yaxis[-1, :]
+                # Handle flagged data. Weights are polarization independent.
+                vw = yaxis_weight[0, :]
+                v_m = np.ma.masked_where(vw == 0, v)
+                if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+                    v_m = np.ma.diff(v_m, axis=0)
+                    if i == 0:
+                        xaxis = xaxis[:-1]
+                    vw = vw[:-1]
+                if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+                    v_m = np.diff(v_m, axis=0)
+                    if i == 0:
+                        xaxis = xaxis[:-1]
+                    vw = vw[:-1]
+                self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
+                self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
+                if np.ma.is_masked(v_m):
+                    for x in xaxis[vw==0]:
+                        self.ax.axvline(x, color='r')
+                    self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
+            else:
+                for i in range(yaxis.shape[0]):
+                    if self.mode == 'values':
+                        v = yaxis[i, :]
+                        vw = yaxis_weight[i, :]
+                        v_m = np.ma.masked_where(yaxis_weight == 0, v)
+                        if 'time' in ax_labels[0] and self.parent.check_tdiff.isChecked():
+                            v_m = np.diff(v_m, axis=0)
+                            if i == 0:
+                                xaxis = xaxis[:-1]
+                            vw = vw[:-1]
+                        if 'freq' in ax_labels[0] and self.parent.check_fdiff.isChecked():
+                            v_m = np.diff(v_m, axis=0)
+                            if i == 0:
+                                xaxis = xaxis[:-1]
+                            vw = vw[:-1]
+                        self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
+                        self.ax.plot(xaxis, v_m, 'h', color='C' + str(i))
+                    elif self.mode == 'weights':
+                        vw = yaxis_weight[i, :]
+                        self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C' + str(i))
+                        self.ax.plot(xaxis, vw, 'h', label=plot_labels[i], color='C' + str(i))
         else:
             if self.mode == 'values':
                 v = yaxis
@@ -1013,10 +1059,12 @@ class H5PlotGUI(QDialog):
         self.check_weights = QCheckBox('Plot weights')
         self.check_tdiff = QCheckBox('Plot time difference')
         self.check_fdiff = QCheckBox('Plot frequency difference')
+        self.check_pdiff = QCheckBox('Plot polarisation difference (XX-YY)')
         self.check_weights.toggled.connect(self._weight_picker_event)
         self.checkbox_layout.addWidget(self.check_weights)
         self.checkbox_layout.addWidget(self.check_tdiff)
         self.checkbox_layout.addWidget(self.check_fdiff)
+        self.checkbox_layout.addWidget(self.check_pdiff)
         self.plotmode = 'values'
 
         self.plot_button = QPushButton('Plot')
