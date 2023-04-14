@@ -910,13 +910,17 @@ class GraphWindow2D(QDialog):
         xaxis = xaxis - xaxis[0]
         yaxis = yaxis * 1e-6
         if self.polarizations is not None:
-            self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s}'.format(self.polarizations[self.polslot], self.direction))
+            if self.do_poldiff:
+                pol = '{:s} - {:s}'.format(self.polarizations[0], self.polarizations[-1])
+            else:
+                pol = self.polarizations[self.polslot]
+            self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s}'.format(pol, self.direction))
             if self.do_timediff and not self.do_freqdiff:
-                self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} time diff'.format(self.polarizations[self.polslot], self.direction))
+                self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} time diff'.format(pol, self.direction))
             if not self.do_timediff and self.do_freqdiff:
-                self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} frequency diff'.format(self.polarizations[self.polslot], self.direction))
+                self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} frequency diff'.format(pol, self.direction))
             if self.do_timediff and self.do_freqdiff:
-                self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} time and frequency diff'.format(self.polarizations[self.polslot], self.direction))
+                self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} time and frequency diff'.format(pol, self.direction))
         else:
             self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s}'.format(self.direction))
         tdiff = np.diff(xaxis)
