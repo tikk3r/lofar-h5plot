@@ -17,7 +17,7 @@ This section summarises the various plotting options that are offered.
 
 ![1D phases]({{ site.baseurl }}/docs/assets/images/plot_1D_phase_freq.png)
 
-![1D amps]({{ site.baseurl }}/docs/assets/images/plot_1D_amp_time.png)
+![1D amps]({{ site.baseurl }}/docs/assets/images/plot_1D_amp_freq.png)
 
 # 2D plots
 2D plots, also called "dynamical spectrum" or "waterfall" plots can be made by selecting the "waterfall" option instead of time or frequency. In this case a two-dimensional plot will be generated showing frequency against time where the colour scale indicates the value of the quantity of interest. If multiple polarisations are present, they can be iterated over using the "forward" and "backward" buttons.
