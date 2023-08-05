@@ -570,10 +570,14 @@ class GraphWindow(QDialog):
                     v_m = np.ma.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
+                    if self.st.getType() == 'phase':
+                        vm = vm % (2 * np.pi)
                 if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
+                    if self.st.getType() == 'phase':
+                        vm = vm % (2 * np.pi)
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
                 if np.ma.is_masked(v_m):
@@ -592,11 +596,15 @@ class GraphWindow(QDialog):
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
+                            if self.st.getType() == 'phase':
+                                vm = vm % (2 * np.pi)
                         if 'freq' in ax_labels[0] and self.do_freqdiff:
                             v_m = np.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
+                            if self.st.getType() == 'phase':
+                                vm = vm % (2 * np.pi)
                         self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
                         self.ax.plot(xaxis, v_m, 'h', label=plot_labels[i], color='C' + str(i))
                         if np.ma.is_masked(v_m):
@@ -620,11 +628,15 @@ class GraphWindow(QDialog):
                     if i == 0:
                         xaxis = xaxis[:-1]
                     vw = vw[:-1]
+                    if self.st.getType() == 'phase':
+                        vm = vm % (2 * np.pi)
                 if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     if i == 0:
                         xaxis = xaxis[:-1]
                     vw = vw[:-1]
+                    if self.st.getType() == 'phase':
+                        vm = vm % (2 * np.pi)
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
                 if np.ma.is_masked(v_m):
@@ -642,11 +654,15 @@ class GraphWindow(QDialog):
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
+                            if self.st.getType() == 'phase':
+                                vm = vm % (2 * np.pi)
                         if 'freq' in ax_labels[0] and self.do_freqdiff:
                             v_m = np.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
+                            if self.st.getType() == 'phase':
+                                vm = vm % (2 * np.pi)
                         self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
                         self.ax.plot(xaxis, v_m, 'h', color='C' + str(i))
                     elif self.mode == 'weights':
@@ -662,10 +678,14 @@ class GraphWindow(QDialog):
                     v_m = np.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
+                    if self.st.getType() == 'phase':
+                        vm = vm % (2 * np.pi)
                 if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
+                    if self.st.getType() == 'phase':
+                        vm = vm % (2 * np.pi)
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', color='C0')
                 if np.ma.is_masked(v_m):
@@ -953,8 +973,12 @@ class GraphWindow2D(QDialog):
                 gapsize = np.abs(plot_x[gapidx+1] - plot_x[gapidx])
         if self.parent.check_tdiff.isChecked():
             vals = np.diff(vals, axis=0)
+            if self.st.getType() == 'phase':
+                vals = vals % (2 * np.pi)
         if self.parent.check_fdiff.isChecked():
             vals = np.diff(vals, axis=1)
+            if self.st.getType() == 'phase':
+                vals = vals % (2 * np.pi)
         if isphase:
             current_cmap = matplotlib.cm.get_cmap('jet')
             current_cmap.set_bad(color='w')
