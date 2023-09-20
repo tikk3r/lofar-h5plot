@@ -1183,6 +1183,7 @@ class H5PlotGUI(QWidget):
 
         self.plot_all_button = QPushButton('Plot all stations')
         self.plot_all_button.clicked.connect(self._plot_all_button_event)
+        self.plot_all_button.setEnabled(False)
 
         self.station_picker = ListWidget()
         self.station_picker.addItems(self.stations)
@@ -1213,6 +1214,10 @@ class H5PlotGUI(QWidget):
         """
         self.logger.debug('Axis changed to: ' + self.axis_picker.currentText())
         self.axis = self.axis_picker.currentText()
+        if self.axis != 'waterfall':
+            self.plot_all_button.setEnabled(False)
+        else:
+            self.plot_all_button.setEnabled(True)
 
     def closeEvent(self, event):
         """ The event triggerd upon closing the main application window.
