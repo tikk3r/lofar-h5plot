@@ -802,7 +802,7 @@ class GraphWindow2D(QDialog):
         self.buttons.addWidget(self.select_label, 0, 1)
         self.buttons.addWidget(self.button_next, 0, 2)
 
-        self.fig = Figure()
+        self.fig = Figure(figsize=(16,9))
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
 
@@ -895,11 +895,14 @@ class GraphWindow2D(QDialog):
             self.button_next.setEnabled(False)
         self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
         diridx = self.parent.directions.index(self.direction)
-        x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        if self.mode == 'values':
-            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-        elif self.mode == 'weights':
-            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        if self.gridplot:
+            self.plot_all()
+        else:
+            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+            if self.mode == 'values':
+                self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+            elif self.mode == 'weights':
+                self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
 
     def _backward_button_event(self):
         """ An event triggered by pressing the "Back" button of a GraphWindow.
@@ -914,13 +917,66 @@ class GraphWindow2D(QDialog):
             self.button_next.setEnabled(True)
         self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
         diridx = self.parent.directions.index(self.direction)
-        x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        if self.mode == 'values':
-            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-        elif self.mode == 'weights':
-            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        if self.gridplot:
+            self.plot_all()
+        else:
+            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+            if self.mode == 'values':
+                self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+            elif self.mode == 'weights':
+                self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+
+    def plot_all(self):
+        self.fig.clf()
+        self.gridplot = True
+        from matplotlib.gridspec import GridSpec
+        import matplotlib.patheffects as pe
+        Nplots = len(self.parent.stations)
+        Ncols = int(np.ceil(np.sqrt(Nplots)))
+        Nrows = int(np.ceil(float(Nplots)/Ncols))
+        # plot_window, axes = plt.subplots(Ncols, Nrows, figsize=(16, 9), constrained_layout=True)
+        gs = GridSpec(Ncols, Nrows, figure=self.fig, left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0.04, wspace=0.025)
+        print(self.parent.stcache.values[0].shape)
+        Nlim = len(self.parent.stations)
+        self.fig.suptitle(self.st.name + ' - {:s}'.format(self.direction))
+        Nplotted = 0
+        for i in range(Nrows):
+            for j in range(Ncols):
+                if Nplotted >= Nlim:
+                    continue
+                ax = self.fig.add_subplot(gs[i, j])
+                ax.set_title(self.parent.stations[Nplotted], y=1.0, pad=-15, color='white', fontweight='bold', path_effects=[pe.withStroke(linewidth=1, foreground="black")])
+                vals = self.parent.stcache.values[0][:, :, Nplotted, self.polslot, self.parent.direction].T
+                x = self.parent.stcache.values[1]['time']
+                y = self.parent.stcache.values[1]['freq'] / 1e6
+                if self.st.getType() == 'phase':
+                    current_cmap = matplotlib.cm.get_cmap('jet')
+                    current_cmap.set_bad(color='w')
+                    im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap)
+                    im.set_clim(-np.pi, np.pi)
+                else:
+                    current_cmap = matplotlib.cm.get_cmap('viridis')
+                    current_cmap.set_bad(color='w')
+                    im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap)
+                    im.set_clim(0.75, 1.25)
+                self.fig.supxlabel('Time [s]')
+                self.fig.supylabel('Frequency [MHz]', x=0.01)
+                if (Nplotted % Ncols):
+                    ax.yaxis.set_visible(False)
+                if (Nplotted < len(self.parent.stations) - Ncols):
+                    ax.xaxis.set_visible(False)
+                Nplotted += 1
+        cbar_ax = self.fig.add_axes([0.955, 0.15, 0.015, 0.8])
+        self.fig.colorbar(im, cax=cbar_ax)
+        self.fig.tight_layout()
+        self.setWindowState(QtCore.Qt.WindowMaximized)
+        self.btn_antiter_prev.setEnabled(False)
+        self.btn_antiter_next.setEnabled(False)
+        self.canvas.draw()
+
 
     def plot(self, xaxis, yaxis, zaxis, frametitle='', limits=[None, None], ax_labels=['', ''], multidim=False, isphase=False):
+        self.gridplot = False
         self.xlabel = ax_labels[0]
         self.ylabel = ax_labels[1]
         self.fig.clf()
@@ -1262,65 +1318,43 @@ class H5PlotGUI(QWidget):
             return
         self.logger.info('Plotting ' + self.soltab.name + \
                          ' for ' + self.solset.name)
-        if not plot_all:
-            antenna = self.station_picker.currentRow()
-            # Data loaded here is xaxis, yaxis, zaxis, isphase
-            print('Loading data')
-            try:
-                #x, y, z, zw, p = msg
-                if hasattr(self, "polarizations"):
-                    if len(self.polarizations) > 1 and self.check_pdiff.isChecked():
-                        # Need to plot polarisation difference.
-                        x, y, z1, zw1, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
-                        x2, y2, z2, zw2, p2 = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=-1, direction=self.direction)
-                        z = z1 - z2
-                        # Combine flags of both polarisations.
-                        zw = zw1 * zw2
-                    else:
-                        x, y, z, zw, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
+        antenna = self.station_picker.currentRow()
+        # Data loaded here is xaxis, yaxis, zaxis, isphase
+        print('Loading data')
+        try:
+            #x, y, z, zw, p = msg
+            if hasattr(self, "polarizations"):
+                if len(self.polarizations) > 1 and self.check_pdiff.isChecked():
+                    # Need to plot polarisation difference.
+                    x, y, z1, zw1, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
+                    x2, y2, z2, zw2, p2 = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=-1, direction=self.direction)
+                    z = z1 - z2
+                    # Combine flags of both polarisations.
+                    zw = zw1 * zw2
                 else:
                     x, y, z, zw, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
-            except ValueError:
-                logging.error('Error loading 2D data!')
-                return
-            if (len(x) == 1) or (len(y) == 1):
-                self.logger.info('Either time or frequency has only 1 entry, not plotting!')
-                return
-            # print('PLOTTING 2D WEIGHTS')
-            try:
-                plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
-            except AttributeError:
-                # No polarizations most likely.
-                plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
-            self.figures.append(plot_window)
+            else:
+                x, y, z, zw, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
+        except ValueError:
+            logging.error('Error loading 2D data!')
+            return
+        if (len(x) == 1) or (len(y) == 1):
+            self.logger.info('Either time or frequency has only 1 entry, not plotting!')
+            return
+        # print('PLOTTING 2D WEIGHTS')
+        try:
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
+        except AttributeError:
+            # No polarizations most likely.
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
+        self.figures.append(plot_window)
+        if plot_all:
+            plot_window.plot_all()
+        else:
             if mode == 'values':
                 plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
             elif mode == 'weights':
                 plot_window.plot(x, y, zw, ax_labels=('Time [s]', 'Freq. [MHz]'), frametitle=self.stations[antenna])
-        else:
-            Nplots = len(self.stations)
-            Ncols = int(np.ceil(np.sqrt(Nplots)))
-            Nrows = int(np.ceil(float(Nplots)/Ncols))
-            plot_window, axes = plt.subplots(Ncols, Nrows, figsize=(16, 9), constrained_layout=True)
-            print(self.stcache.values[0].shape)
-            Nlim = len(self.stations)
-            for i, ax in enumerate(np.ravel(axes)):
-                if i >= Nlim:
-                    plot_window.delaxes(ax)
-                    continue
-                ax.set_title(self.stations[i], y=1.0, pad=-15, color='white', fontweight='bold')
-                vals = self.stcache.values[0][:, :, i, 0, self.direction].T
-                x = self.stcache.values[1]['time']
-                y = self.stcache.values[1]['freq'] / 1e6
-                ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none')
-                plot_window.supxlabel('Time [s]')
-                plot_window.supylabel('Frequency [MHz]', x=0.01)
-                if (i % Ncols):
-                    ax.yaxis.set_visible(False)
-                if (i < len(self.stations) - Ncols):
-                    ax.xaxis.set_visible(False)
-            plt.tight_layout()
-            plt.subplots_adjust(hspace=0.04, wspace=0.025)
 
         plot_window.show()
 
