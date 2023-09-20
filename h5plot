@@ -571,13 +571,13 @@ class GraphWindow(QDialog):
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = vm % (2 * np.pi)
+                        vm = wrap_phase(vm)
                 if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = vm % (2 * np.pi)
+                        vm = wrap_phase(vm)
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
                 if np.ma.is_masked(v_m):
@@ -597,14 +597,14 @@ class GraphWindow(QDialog):
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
                             if self.st.getType() == 'phase':
-                                vm = vm % (2 * np.pi)
+                                vm = wrap_phase(vm)
                         if 'freq' in ax_labels[0] and self.do_freqdiff:
                             v_m = np.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
                             if self.st.getType() == 'phase':
-                                vm = vm % (2 * np.pi)
+                                vm = wrap_phase(vm)
                         self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
                         self.ax.plot(xaxis, v_m, 'h', label=plot_labels[i], color='C' + str(i))
                         if np.ma.is_masked(v_m):
@@ -629,14 +629,14 @@ class GraphWindow(QDialog):
                         xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = vm % (2 * np.pi)
+                        vm = wrap_phase(vm)
                 if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     if i == 0:
                         xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = vm % (2 * np.pi)
+                        vm = wrap_phase(vm)
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
                 if np.ma.is_masked(v_m):
@@ -655,14 +655,14 @@ class GraphWindow(QDialog):
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
                             if self.st.getType() == 'phase':
-                                vm = vm % (2 * np.pi)
+                                vm = wrap_phase(vm)
                         if 'freq' in ax_labels[0] and self.do_freqdiff:
                             v_m = np.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
                             if self.st.getType() == 'phase':
-                                vm = vm % (2 * np.pi)
+                                vm = wrap_phase(vm)
                         self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
                         self.ax.plot(xaxis, v_m, 'h', color='C' + str(i))
                     elif self.mode == 'weights':
@@ -679,13 +679,13 @@ class GraphWindow(QDialog):
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = vm % (2 * np.pi)
+                        vm = wrap_phase(vm)
                 if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = vm % (2 * np.pi)
+                        vm = wrap_phase(vm)
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', color='C0')
                 if np.ma.is_masked(v_m):
@@ -946,17 +946,52 @@ class GraphWindow2D(QDialog):
                     continue
                 ax = self.fig.add_subplot(gs[i, j])
                 ax.set_title(self.parent.stations[Nplotted], y=1.0, pad=-15, color='white', fontweight='bold', path_effects=[pe.withStroke(linewidth=1, foreground="black")])
-                vals = self.parent.stcache.values[0][:, :, Nplotted, self.polslot, self.parent.direction].T
                 x = self.parent.stcache.values[1]['time']
                 y = self.parent.stcache.values[1]['freq'] / 1e6
                 if self.st.getType() == 'phase':
                     current_cmap = matplotlib.cm.get_cmap('jet')
                     current_cmap.set_bad(color='w')
+                    if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
+                        if self.do_poldiff:
+                            vals = wrap_phase(self.parent.stcache.values[0][:, :, 0, self.parent.direction] - self.parent.stcache.values[0][:, :, -1, self.parent.direction])
+                        else:
+                            vals = (self.parent.stcache.values[0][:, :, Nplotted, self.polslot, self.parent.direction] - self.parent.stcache.values[0][:, :, self.refantindex, self.polslot, self.parent.direction]).T
+                    elif not ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
+                        vals = (self.parent.stcache.values[0][:, :, Nplotted, self.parent.direction] - self.parent.stcache.values[0][:, :, self.refantindex, self.parent.direction]).T
+                    elif ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
+                        if self.do_poldiff:
+                            vals = wrap_phase(self.parent.stcache.values[0][:, :, 0] - self.parent.stcache.values[0][:, :, -1])
+                        else:
+                            vals = (self.parent.stcache.values[0][:, :, Nplotted, self.polslot] - self.parent.stcache.values[0][:, :, self.refantindex, self.polslot]).T
+                    elif not ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
+                        vals = (self.parent.stcache.values[0][:, :, Nplotted] - self.parent.stcache.values[0][:, :, self.refantindex]).T
+                    if self.do_timediff:
+                        vals = wrap_phase(np.diff(vals, axis=0))
+                    if self.do_freqdiff:
+                        vals = wrap_phase(np.diff(vals, axis=1))
                     im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap)
                     im.set_clim(-np.pi, np.pi)
                 else:
                     current_cmap = matplotlib.cm.get_cmap('viridis')
                     current_cmap.set_bad(color='w')
+                    if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
+                        if self.do_poldiff:
+                            vals = self.parent.stcache.values[0][:, :, Nplotted, 0, self.parent.direction]
+                        else:
+                            vals = self.parent.stcache.values[0][:, :, Nplotted, self.polslot, self.parent.direction].T
+                    elif not ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
+                        vals = self.parent.stcache.values[0][:, :, Nplotted, self.parent.direction].T
+                    elif ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
+                        if self.do_poldiff:
+                            vals = self.parent.stcache.values[0][:, :, Nplotted, 0]
+                        else:
+                            vals = self.parent.stcache.values[0][:, :, Nplotted, self.polslot].T
+                    elif not ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
+                        vals = self.parent.stcache.values[0][:, :, Nplotted].T
+                    if self.do_timediff:
+                        vals = np.diff(vals, axis=0)
+                    if self.do_freqdiff:
+                        vals = np.diff(vals, axis=1)
                     im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap)
                     im.set_clim(0.75, 1.25)
                 self.fig.supxlabel('Time [s]')
@@ -1030,11 +1065,11 @@ class GraphWindow2D(QDialog):
         if self.parent.check_tdiff.isChecked():
             vals = np.diff(vals, axis=0)
             if self.st.getType() == 'phase':
-                vals = vals % (2 * np.pi)
+                vals = wrap_phase(vals)
         if self.parent.check_fdiff.isChecked():
             vals = np.diff(vals, axis=1)
             if self.st.getType() == 'phase':
-                vals = vals % (2 * np.pi)
+                vals = wrap_phase(vals)
         if isphase:
             current_cmap = matplotlib.cm.get_cmap('jet')
             current_cmap.set_bad(color='w')
