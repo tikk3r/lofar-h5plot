@@ -536,8 +536,6 @@ class GraphWindow(QDialog):
     def plot(self, xaxis, yaxis, yaxis_weight, frametitle='', limits=[None, None], ax_labels=['', ''], plot_labels=[], multidim=False, isphase=False):
         self.xlabel = ax_labels[0]
         self.ylabel = ax_labels[1]
-        self.xlabelp = plot_labels[0]
-        self.ylabelp = plot_labels[1]
         self.fig.clf()
         self.ax = self.fig.add_subplot(111)
         self.ax.clear()
