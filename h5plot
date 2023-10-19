@@ -1000,8 +1000,11 @@ class GraphWindow2D(QDialog):
                     elif not ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
                         vals = self.parent.stcache.weights[:, :, Nplotted, self.polslot]
                     im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap)
-                self.fig.supxlabel('Time [s]')
-                self.fig.supylabel('Frequency [MHz]', x=0.01)
+                try:
+                    self.fig.supxlabel('Time [s]')
+                    self.fig.supylabel('Frequency [MHz]', x=0.01)
+                except AttributeError:
+                    self.LOGGER.warning('Setting labels with supxlabel/supylabel failed, not plotting axes labels. You may need to updated matplotlib to >3.4.')
                 if (Nplotted % Ncols):
                     ax.yaxis.set_visible(False)
                 if (Nplotted < len(self.parent.stations) - Ncols):
