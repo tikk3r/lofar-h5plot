@@ -990,7 +990,7 @@ class GraphWindow2D(QDialog):
                             vals = np.diff(vals, axis=0)
                         if self.do_freqdiff:
                             vals = np.diff(vals, axis=1)
-                        im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap, origin='lower')
+                        im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap, origin='lower', vmin=0.5, vmax=2.0)
                 elif self.mode == 'weights':
                     current_cmap = matplotlib.cm.get_cmap('viridis')
                     if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
