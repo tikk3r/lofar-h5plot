@@ -569,13 +569,13 @@ class GraphWindow(QDialog):
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = wrap_phase(vm)
+                        v_m = wrap_phase(v_m)
                 if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = wrap_phase(vm)
+                        v_m = wrap_phase(v_m)
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
                 if np.ma.is_masked(v_m):
@@ -595,14 +595,14 @@ class GraphWindow(QDialog):
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
                             if self.st.getType() == 'phase':
-                                vm = wrap_phase(vm)
+                                v_m = wrap_phase(v_m)
                         if 'freq' in ax_labels[0] and self.do_freqdiff:
                             v_m = np.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
                             if self.st.getType() == 'phase':
-                                vm = wrap_phase(vm)
+                                v_m = wrap_phase(v_m)
                         self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
                         self.ax.plot(xaxis, v_m, 'h', label=plot_labels[i], color='C' + str(i))
                         if np.ma.is_masked(v_m):
@@ -627,14 +627,14 @@ class GraphWindow(QDialog):
                         xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = wrap_phase(vm)
+                        v_m = wrap_phase(v_m)
                 if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     if i == 0:
                         xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = wrap_phase(vm)
+                        v_m = wrap_phase(v_m)
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
                 if np.ma.is_masked(v_m):
@@ -653,14 +653,14 @@ class GraphWindow(QDialog):
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
                             if self.st.getType() == 'phase':
-                                vm = wrap_phase(vm)
+                                v_m = wrap_phase(v_m)
                         if 'freq' in ax_labels[0] and self.do_freqdiff:
                             v_m = np.diff(v_m, axis=0)
                             if i == 0:
                                 xaxis = xaxis[:-1]
                             vw = vw[:-1]
                             if self.st.getType() == 'phase':
-                                vm = wrap_phase(vm)
+                                v_m = wrap_phase(v_m)
                         self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
                         self.ax.plot(xaxis, v_m, 'h', color='C' + str(i))
                     elif self.mode == 'weights':
@@ -677,13 +677,13 @@ class GraphWindow(QDialog):
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = wrap_phase(vm)
+                        v_m = wrap_phase(v_m)
                 if 'freq' in ax_labels[0] and self.do_freqdiff:
                     v_m = np.diff(v_m, axis=0)
                     xaxis = xaxis[:-1]
                     vw = vw[:-1]
                     if self.st.getType() == 'phase':
-                        vm = wrap_phase(vm)
+                        v_m = wrap_phase(v_m)
                 self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
                 self.ax.plot(xaxis, v_m, 'h', color='C0')
                 if np.ma.is_masked(v_m):
