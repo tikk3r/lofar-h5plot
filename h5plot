@@ -994,11 +994,11 @@ class GraphWindow2D(QDialog):
                 elif self.mode == 'weights':
                     current_cmap = matplotlib.cm.get_cmap('viridis')
                     if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
-                        vals = self.parent.stcache.weights[:, :, Nplotted, self.polslot, self.parent.direction]
+                        vals = self.parent.stcache.weights[:, :, Nplotted, self.polslot, self.parent.direction].T
                     elif not ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
-                        vals = self.parent.stcache.weights[:, :, Nplotted, self.parent.direction]
+                        vals = self.parent.stcache.weights[:, :, Nplotted, self.parent.direction].T
                     elif not ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
-                        vals = self.parent.stcache.weights[:, :, Nplotted, self.polslot]
+                        vals = self.parent.stcache.weights[:, :, Nplotted, self.polslot].T
                     im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap, origin='lower')
                 try:
                     self.fig.supxlabel('Time [s]')
