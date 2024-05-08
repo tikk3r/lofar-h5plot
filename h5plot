@@ -821,10 +821,17 @@ class GraphWindow2D(QDialog):
         self.btn_antiter_prev = QPushButton('Previous antenna')
         self.btn_antiter_prev.clicked.connect(self._antiter_prev_button_event)
 
+        self.btn_diriter_next = QPushButton('Next direction')
+        self.btn_diriter_next.clicked.connect(self._diriter_next_button_event)
+        self.btn_diriter_prev = QPushButton('Previous direction')
+        self.btn_diriter_prev.clicked.connect(self._diriter_prev_button_event)
+
         antiter_widget = QWidget()
         antiter_layout = QHBoxLayout(antiter_widget)
         antiter_layout.addWidget(self.btn_antiter_prev)
         antiter_layout.addWidget(self.btn_antiter_next)
+        antiter_layout.addWidget(self.btn_diriter_prev)
+        antiter_layout.addWidget(self.btn_diriter_next)
 
         self.buttons = QGridLayout()
         self.buttons.addWidget(self.button_prev, 0, 0)
@@ -895,6 +902,52 @@ class GraphWindow2D(QDialog):
         else:
             self.antindex = len(self.parent.stations) - 1
         diridx = self.parent.directions.index(self.direction)
+        if len(self.polarizations) > 1 and self.do_poldiff:
+            # Need to plot polarisation difference.
+            x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 0, direction=diridx)
+            x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, -1, direction=diridx)
+            z = z1 - z2
+            # Combine flags of both polarisations.
+            zw = zw1 * zw2
+        else:
+            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+        self.frametitle = self.parent.stations[self.antindex]
+        if self.mode == 'values':
+            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        elif self.mode == 'weights':
+            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        self.setWindowTitle(self.frametitle)
+
+    def _diriter_next_button_event(self):
+        diridx = self.parent.directions.index(self.direction)
+        if (diridx + 1) < len(self.parent.directions):
+            diridx += 1
+        else:
+            diridx = 0
+        self.direction = self.parent.directions[diridx]
+        if len(self.polarizations) > 1 and self.do_poldiff:
+            # Need to plot polarisation difference.
+            x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 0, direction=diridx)
+            x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, -1, direction=diridx)
+            z = z1 - z2
+            # Combine flags of both polarisations.
+            zw = zw1 * zw2
+        else:
+            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
+        self.frametitle = self.parent.stations[self.antindex]
+        if self.mode == 'values':
+            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+        elif self.mode == 'weights':
+            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        self.setWindowTitle(self.frametitle)
+
+    def _diriter_prev_button_event(self):
+        diridx = self.parent.directions.index(self.direction)
+        if (diridx - 1) > 0:
+            diridx -= 1
+        else:
+            diridx = -1
+        self.direction = self.parent.directions[diridx]
         if len(self.polarizations) > 1 and self.do_poldiff:
             # Need to plot polarisation difference.
             x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 0, direction=diridx)
