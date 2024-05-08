@@ -924,6 +924,7 @@ class GraphWindow2D(QDialog):
             diridx += 1
         else:
             diridx = 0
+        self.parent.direction = diridx
         self.direction = self.parent.directions[diridx]
         if len(self.polarizations) > 1 and self.do_poldiff:
             # Need to plot polarisation difference.
@@ -935,10 +936,13 @@ class GraphWindow2D(QDialog):
         else:
             x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
         self.frametitle = self.parent.stations[self.antindex]
-        if self.mode == 'values':
-            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-        elif self.mode == 'weights':
-            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        if self.gridplot:
+            self.plot_all()
+        else:
+            if self.mode == 'values':
+                self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+            elif self.mode == 'weights':
+                self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
         self.setWindowTitle(self.frametitle)
 
     def _diriter_prev_button_event(self):
@@ -947,6 +951,7 @@ class GraphWindow2D(QDialog):
             diridx -= 1
         else:
             diridx = -1
+        self.parent.direction = diridx#self.parent.directions[diridx]
         self.direction = self.parent.directions[diridx]
         if len(self.polarizations) > 1 and self.do_poldiff:
             # Need to plot polarisation difference.
@@ -958,10 +963,13 @@ class GraphWindow2D(QDialog):
         else:
             x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
         self.frametitle = self.parent.stations[self.antindex]
-        if self.mode == 'values':
-            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-        elif self.mode == 'weights':
-            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        if self.gridplot:
+            self.plot_all()
+        else:
+            if self.mode == 'values':
+                self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
+            elif self.mode == 'weights':
+                self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
         self.setWindowTitle(self.frametitle)
 
     def _forward_button_event(self):
