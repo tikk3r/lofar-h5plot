@@ -379,10 +379,17 @@ class GraphWindow(QDialog):
         self.btn_antiter_prev = QPushButton('Previous antenna')
         self.btn_antiter_prev.clicked.connect(self._antiter_prev_button_event)
 
+        self.btn_diriter_next = QPushButton('Next direction')
+        self.btn_diriter_next.clicked.connect(self._diriter_next_button_event)
+        self.btn_diriter_prev = QPushButton('Previous direction')
+        self.btn_diriter_prev.clicked.connect(self._diriter_prev_button_event)
+
         antiter_widget = QWidget()
         antiter_layout = QHBoxLayout(antiter_widget)
         antiter_layout.addWidget(self.btn_antiter_prev)
         antiter_layout.addWidget(self.btn_antiter_next)
+        antiter_layout.addWidget(self.btn_diriter_prev)
+        antiter_layout.addWidget(self.btn_diriter_next)
 
         self.buttons = QGridLayout()
         self.buttons.addWidget(self.button_prev, 0, 0)
@@ -449,6 +456,30 @@ class GraphWindow(QDialog):
         else:
             self.antindex = len(self.parent.stations) - 1
         diridx = self.parent.directions.index(self.direction)
+        x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
+        self.frametitle = self.parent.stations[self.antindex]
+        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+        self.setWindowTitle(self.frametitle)
+
+    def _diriter_next_button_event(self):
+        diridx = self.parent.directions.index(self.direction)
+        if (diridx + 1) < len(self.parent.directions):
+            diridx += 1
+        else:
+            diridx = 0
+        self.direction = self.parent.directions[diridx]
+        x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
+        self.frametitle = self.parent.stations[self.antindex]
+        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+        self.setWindowTitle(self.frametitle)
+
+    def _diriter_prev_button_event(self):
+        diridx = self.parent.directions.index(self.direction)
+        if (diridx - 1) > 0:
+            diridx -= 1
+        else:
+            diridx = -1
+        self.direction = self.parent.directions[diridx]
         x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
         self.frametitle = self.parent.stations[self.antindex]
         self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
