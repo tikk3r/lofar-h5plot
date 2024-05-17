@@ -1499,7 +1499,8 @@ class H5PlotGUI(QWidget):
             plot_window.plot_all()
         else:
             if mode == 'values':
-                plot_window.plot(x, y, z, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
+                zm = np.ma.masked_where(zw == 0, z)
+                plot_window.plot(x, y, zm, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
             elif mode == 'weights':
                 plot_window.plot(x, y, zw, ax_labels=('Time [s]', 'Freq. [MHz]'), frametitle=self.stations[antenna])
 
