@@ -1039,7 +1039,7 @@ class GraphWindow2D(QDialog):
                 y = self.parent.stcache.values[1]['freq'] / 1e6
                 if self.mode == 'values':
                     if self.st.getType() == 'phase':
-                        current_cmap = matplotlib.cm.get_cmap('jet')
+                        current_cmap = matplotlib.colormaps['jet']
                         current_cmap.set_bad(color='w')
                         if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
                             if self.do_poldiff:
@@ -1062,7 +1062,7 @@ class GraphWindow2D(QDialog):
                         im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap)
                         im.set_clim(-np.pi, np.pi)
                     else:
-                        current_cmap = matplotlib.cm.get_cmap('viridis')
+                        current_cmap = matplotlib.colormaps['viridis']
                         current_cmap.set_bad(color='w')
                         if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
                             if self.do_poldiff:
@@ -1084,7 +1084,7 @@ class GraphWindow2D(QDialog):
                             vals = np.diff(vals, axis=1)
                         im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap, origin='lower', vmin=0.5, vmax=2.0)
                 elif self.mode == 'weights':
-                    current_cmap = matplotlib.cm.get_cmap('viridis')
+                    current_cmap = matplotlib.colormaps['viridis']
                     if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
                         vals = self.parent.stcache.weights[:, :, Nplotted, self.polslot, self.parent.direction].T
                     elif not ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
@@ -1172,12 +1172,12 @@ class GraphWindow2D(QDialog):
             if self.st.getType() == 'phase':
                 vals = wrap_phase(vals)
         if isphase:
-            current_cmap = matplotlib.cm.get_cmap('jet')
+            current_cmap = matplotlib.colormaps['jet']
             current_cmap.set_bad(color='w')
             im = self.ax.imshow(vals.T, interpolation='none', extent=[plot_x[0], plot_x[-1], plot_y[0], plot_y[-1]], aspect='auto', cmap=current_cmap, origin='lower')
             im.set_clim(-np.pi, np.pi)
         else:
-            current_cmap = matplotlib.cm.get_cmap('viridis')
+            current_cmap = matplotlib.colormaps['viridis']
             current_cmap.set_bad(color='w')
             im = self.ax.imshow(vals.T, interpolation='none', extent=[plot_x[0], plot_x[-1], plot_y[0], plot_y[-1]], aspect='auto', cmap=current_cmap, origin='lower')
         cb = self.fig.colorbar(im)
