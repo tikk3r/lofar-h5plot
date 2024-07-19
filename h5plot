@@ -1043,22 +1043,23 @@ class GraphWindow2D(QDialog):
                         current_cmap.set_bad(color='w')
                         if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
                             if self.do_poldiff:
-                                vals = wrap_phase(self.parent.stcache.values[0][:, :, 0, self.parent.direction] - self.parent.stcache.values[0][:, :, -1, self.parent.direction]).T
+                                vals = (self.parent.stcache.values[0][:, :, 0, self.parent.direction] - self.parent.stcache.values[0][:, :, -1, self.parent.direction]).T
                             else:
                                 vals = (self.parent.stcache.values[0][:, :, Nplotted, self.polslot, self.parent.direction] - self.parent.stcache.values[0][:, :, self.refantindex, self.polslot, self.parent.direction]).T
                         elif not ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
                             vals = (self.parent.stcache.values[0][:, :, Nplotted, self.parent.direction] - self.parent.stcache.values[0][:, :, self.refantindex, self.parent.direction]).T
                         elif ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
                             if self.do_poldiff:
-                                vals = wrap_phase(self.parent.stcache.values[0][:, :, 0] - self.parent.stcache.values[0][:, :, -1]).T
+                                vals = (self.parent.stcache.values[0][:, :, 0] - self.parent.stcache.values[0][:, :, -1]).T
                             else:
                                 vals = (self.parent.stcache.values[0][:, :, Nplotted, self.polslot] - self.parent.stcache.values[0][:, :, self.refantindex, self.polslot]).T
                         elif not ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
                             vals = (self.parent.stcache.values[0][:, :, Nplotted] - self.parent.stcache.values[0][:, :, self.refantindex]).T
                         if self.do_timediff:
-                            vals = wrap_phase(np.diff(vals, axis=0))
+                            vals = np.diff(vals, axis=0)
                         if self.do_freqdiff:
-                            vals = wrap_phase(np.diff(vals, axis=1))
+                            vals = np.diff(vals, axis=1)
+                        vals = wrap_phase(vals)
                         im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap)
                         im.set_clim(-np.pi, np.pi)
                     else:
