@@ -1378,8 +1378,12 @@ class H5PlotGUI(QWidget):
 
         Sets the `solset` attribute.
         """
-        self.logger.debug('Solset changed to: ' + self.solset_picker.currentText())
+        solset_prev = self.solset.name
         self.solset = self.h5parm.getSolset(self.solset_picker.currentText())
+        if self.solset.name == solset_prev:
+            self.logger.debug("Solset unchanged, not reordering")
+            return
+        self.logger.debug('Solset changed to: ' + self.solset_picker.currentText())
         self.soltab_labels = self.solset.getSoltabNames()
         self.soltab_picker.clear()
         for l in self.soltab_labels:
@@ -1391,8 +1395,12 @@ class H5PlotGUI(QWidget):
 
         Sets the `soltab` attribute.
         """
-        self.logger.debug('Soltab changed to: ' + self.soltab_picker.currentText())
+        soltab_prev = self.soltab.name
         self.soltab = self.solset.getSoltab(self.soltab_picker.currentText())
+        if self.soltab.name == soltab_prev:
+            self.logger.debug("Soltab unchanged, not reordering")
+            return
+        self.logger.debug('Soltab changed to: ' + self.soltab_picker.currentText())
         stations_old = self.stations
         self.stations = self.soltab.getValues()[1]['ant']
         if not np.array_equiv(stations_old, self.stations):
