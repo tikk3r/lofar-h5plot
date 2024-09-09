@@ -7,11 +7,9 @@ import sys
 
 import losoto.h5parm as lh5
 
-from .ui.widgets import H5PlotGUI
+from .ui.widgets import H5PlotGUI, palette_dark
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPalette, QColor
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication
 
 def main():
     print('H5Plot ' + __version__)
@@ -50,25 +48,10 @@ def main():
         soltabs = ss.getSoltabNames()
         print('\t' + ', '.join(soltabs))
 
-    # Now use a palette to switch to dark colors:
-    palette = QPalette()
-    palette.setColor(QPalette.Window, QColor(53, 53, 53))
-    palette.setColor(QPalette.WindowText, Qt.white)
-    palette.setColor(QPalette.Base, QColor(25, 25, 25))
-    palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-    palette.setColor(QPalette.ToolTipBase, Qt.black)
-    palette.setColor(QPalette.ToolTipText, Qt.white)
-    palette.setColor(QPalette.Text, Qt.white)
-    palette.setColor(QPalette.Button, QColor(53, 53, 53))
-    palette.setColor(QPalette.ButtonText, Qt.white)
-    palette.setColor(QPalette.BrightText, Qt.red)
-    palette.setColor(QPalette.Link, QColor(42, 130, 218))
-    palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-    palette.setColor(QPalette.HighlightedText, Qt.black)
     # Initialize the GUI.
     APP = QApplication(sys.argv)
     APP.setFont("JetBrains Mono")
-    APP.setPalette(palette)
+    APP.setPalette(palette_dark)
     GUI = H5PlotGUI(args.FILENAME, LOGGER)
     GUI.show()
     APP.exec_()

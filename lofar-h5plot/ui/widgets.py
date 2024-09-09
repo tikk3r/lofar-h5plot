@@ -2,10 +2,28 @@
 import losoto.h5parm as lh5
 
 from PySide6 import QtCore, QtWidgets
+from PySide6.QtGui import QPalette, QColor
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QListWidget
 from PySide6.QtWidgets import QWidget
 
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGridLayout, QLabel, QListWidget, QPushButton, QWidget
+
+# Now use a palette to switch to dark colors:
+palette_dark = QPalette()
+palette_dark.setColor(QPalette.Window, QColor(53, 53, 53))
+palette_dark.setColor(QPalette.WindowText, Qt.white)
+palette_dark.setColor(QPalette.Base, QColor(25, 25, 25))
+palette_dark.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+palette_dark.setColor(QPalette.ToolTipBase, Qt.black)
+palette_dark.setColor(QPalette.ToolTipText, Qt.white)
+palette_dark.setColor(QPalette.Text, Qt.white)
+palette_dark.setColor(QPalette.Button, QColor(53, 53, 53))
+palette_dark.setColor(QPalette.ButtonText, Qt.white)
+palette_dark.setColor(QPalette.BrightText, Qt.red)
+palette_dark.setColor(QPalette.Link, QColor(42, 130, 218))
+palette_dark.setColor(QPalette.Highlight, QColor(42, 130, 218))
+palette_dark.setColor(QPalette.HighlightedText, Qt.black)
 
 class ListWidget(QListWidget):
     """ Version of QListWidget that resizes itself.
