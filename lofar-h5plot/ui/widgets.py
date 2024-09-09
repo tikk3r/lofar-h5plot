@@ -47,6 +47,12 @@ class ListWidget(QListWidget):
         width = super().viewportSizeHint().width()
         return QtCore.QSize(width, height)
 
+def try_get_axis(soltab, axis):
+    try: 
+        return soltab.getAxisValues(axis)
+    except TypeError:
+        return None
+
 class H5PlotGUI(QWidget):
     """The main GUI for H5Plot.
 
@@ -72,26 +78,11 @@ class H5PlotGUI(QWidget):
         self.soltab_labels = self.solset.getSoltabNames()
         self.soltab = self.solset.getSoltab(self.soltab_labels[0])
 
-        for l in self.soltab_labels:
-            try:
-                self.frequencies = self.solset.getSoltab(l).getAxisValues('freq')
-                break
-            except TypeError:
-                pass
-        for l in self.soltab_labels:
-            try:
-                self.times = self.solset.getSoltab(l).getAxisValues('time')
-                break
-            except TypeError:
-                pass
-        for l in self.soltab_labels:
-            try:
-                if 'pol' in self.solset.getSoltab(l).getAxesNames():
-                    self.polarizations = self.solset.getSoltab(l).getAxisValues('pol')
-                break
-            except TypeError:
-                pass
+        self.frequencies = try_get_axis(self.soltab, "freq")
+        self.times = try_get_axis(self.soltab, "time")
         self.stations = self.soltab.getValues()[1]['ant']
+        if 'pol' in self.soltab.getAxesNames():
+            self.frequencies = try_get_axis(self.soltab, "pol")
         try:
             self.directions = [s.decode('utf-8') for s in self.solset.getSou().keys()]
         except AttributeError:
