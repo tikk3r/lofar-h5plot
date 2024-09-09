@@ -20,12 +20,12 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description='Interactive plotter to explore LOFAR H5parm solutions.')
     parser.add_argument('FILENAME')
+    parser.add_argument("--debug", action="store_true", help="Enable DEBUG level logging.")
     args = parser.parse_args()
 
     H5FILE = lh5.h5parm(args.FILENAME, readonly=True)
-    # Set up for logging output.
     LOGGER = logging.getLogger('H5plot_logger')
-    if '--debug' in sys.argv:
+    if args.debug:
         LOGGER.setLevel(logging.DEBUG)
     else:
         LOGGER.setLevel(logging.INFO)
