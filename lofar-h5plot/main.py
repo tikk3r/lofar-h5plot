@@ -7,7 +7,8 @@ import sys
 
 import losoto.h5parm as lh5
 
-from .ui.widgets import H5PlotGUI, ColourPalette
+from .ui.widgets import ColourPalette
+from .ui.window import H5PlotGUI
 
 from PySide6.QtWidgets import QApplication
 
