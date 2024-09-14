@@ -1,10 +1,13 @@
 from .widgets import ListWidget
+from ..data import reorder_soltab
+from ..data.cache import SoltabCache
 
 from PySide6.QtWidgets import QWidget
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGridLayout, QLabel, QPushButton, QWidget
 
 import losoto.h5parm as lh5
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def try_get_axis(soltab, axis):
@@ -53,9 +56,9 @@ class H5PlotGUI(QWidget):
         self.refant = self.stations[0]
         self.wrapphase = True
 
-        #self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames(), weights=self.soltab.getValues(weight=True)[0])
-        #rvals, rweights, raxes = reorder_soltab(self.soltab)
-        #self.stcache.update(rvals, raxes, weights=rweights)
+        self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames(), weights=self.soltab.getValues(weight=True)[0])
+        rvals, rweights, raxes = reorder_soltab(self.soltab)
+        self.stcache.update(rvals, raxes, weights=rweights)
 
         self.move(300, 300)
         self.setWindowTitle('H5Plot')
@@ -71,16 +74,16 @@ class H5PlotGUI(QWidget):
         self.soltab_picker = QComboBox()
         for l in self.soltab_labels:
             self.soltab_picker.addItem(l)
-        #self.soltab_picker.activated.connect(self._soltab_picker_event)
+        self.soltab_picker.activated.connect(self._soltab_picker_event)
         self.axis_picker = QComboBox()
         self.axis_picker.addItems(['time', 'freq', 'waterfall'])
-        #self.axis_picker.activated.connect(self._axis_picker_event)
+        self.axis_picker.activated.connect(self._axis_picker_event)
         self.axis = 'time'
 
         self.refant_label = QLabel('Ref. Ant. ')
         self.refant_picker = QComboBox()
         self.refant_picker.addItems(self.stations)
-        #self.refant_picker.activated.connect(self._refant_picker_event)
+        self.refant_picker.activated.connect(self._refant_picker_event)
 
         # self.phasewrap_box = QCheckBox('Wrap Phases')
         # self.phasewrap_box.setChecked(True)
@@ -89,7 +92,7 @@ class H5PlotGUI(QWidget):
         self.dir_label = QLabel('Dir.')
         self.dir_picker = QComboBox()
         self.dir_picker.addItems(self.directions)
-        #self.dir_picker.activated.connect(self._dir_picker_event)
+        self.dir_picker.activated.connect(self._dir_picker_event)
 
         self.checkbox_layout = QGridLayout()
         self.check_weights = QCheckBox('Plot weights')
@@ -97,7 +100,7 @@ class H5PlotGUI(QWidget):
         self.check_fdiff = QCheckBox('Freq. diff.')
         self.check_pdiff = QCheckBox('Pol. diff. (XX-YY)')
 
-        #self.check_weights.toggled.connect(self._weight_picker_event)
+        self.check_weights.toggled.connect(self._weight_picker_event)
         self.checkbox_layout.addWidget(self.check_weights, 0, 0)
         self.checkbox_layout.addWidget(self.check_tdiff, 0, 1)
         self.checkbox_layout.addWidget(self.check_fdiff, 1, 1)
@@ -106,10 +109,10 @@ class H5PlotGUI(QWidget):
         self.plotmode = 'values'
 
         self.plot_button = QPushButton('Plot')
-        #self.plot_button.clicked.connect(self._plot_button_event)
+        self.plot_button.clicked.connect(self._plot_button_event)
 
         self.plot_all_button = QPushButton('Plot all stations')
-        #self.plot_all_button.clicked.connect(self._plot_all_button_event)
+        self.plot_all_button.clicked.connect(self._plot_all_button_event)
         self.plot_all_button.setEnabled(False)
 
         self.station_picker = ListWidget()
