@@ -4,7 +4,7 @@ from PySide6.QtGui import QPalette, QColor
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QListWidget
 
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGridLayout, QLabel, QListWidget, QPushButton, QWidget
+from PySide6.QtWidgets import QListWidget
 
 # Now use a palette to switch to dark colors:
 class ColourPalette:
