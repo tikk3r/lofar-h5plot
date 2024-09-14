@@ -7,7 +7,7 @@ import sys
 
 import losoto.h5parm as lh5
 
-from .ui.widgets import H5PlotGUI, palette_dark
+from .ui.widgets import H5PlotGUI, ColourPalette
 
 from PySide6.QtWidgets import QApplication
 
@@ -49,9 +49,10 @@ def main():
         print('\t' + ', '.join(soltabs))
 
     # Initialize the GUI.
+    CP = ColourPalette()
     APP = QApplication(sys.argv)
     APP.setFont("JetBrains Mono")
-    APP.setPalette(palette_dark)
+    APP.setPalette(CP.get_palette_dark())
     GUI = H5PlotGUI(args.FILENAME, LOGGER)
     GUI.show()
     APP.exec_()

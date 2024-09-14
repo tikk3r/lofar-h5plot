@@ -1,5 +1,6 @@
 """ Module to hold UI related code """
 import losoto.h5parm as lh5
+import matplotlib.pyplot as plt
 
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtGui import QPalette, QColor
@@ -10,20 +11,23 @@ from PySide6.QtWidgets import QWidget
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGridLayout, QLabel, QListWidget, QPushButton, QWidget
 
 # Now use a palette to switch to dark colors:
-palette_dark = QPalette()
-palette_dark.setColor(QPalette.Window, QColor(53, 53, 53))
-palette_dark.setColor(QPalette.WindowText, Qt.white)
-palette_dark.setColor(QPalette.Base, QColor(25, 25, 25))
-palette_dark.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-palette_dark.setColor(QPalette.ToolTipBase, Qt.black)
-palette_dark.setColor(QPalette.ToolTipText, Qt.white)
-palette_dark.setColor(QPalette.Text, Qt.white)
-palette_dark.setColor(QPalette.Button, QColor(53, 53, 53))
-palette_dark.setColor(QPalette.ButtonText, Qt.white)
-palette_dark.setColor(QPalette.BrightText, Qt.red)
-palette_dark.setColor(QPalette.Link, QColor(42, 130, 218))
-palette_dark.setColor(QPalette.Highlight, QColor(42, 130, 218))
-palette_dark.setColor(QPalette.HighlightedText, Qt.black)
+class ColourPalette:
+    def get_palette_dark(self):
+        palette_dark = QPalette()
+        palette_dark.setColor(QPalette.Window, QColor(53, 53, 53))
+        palette_dark.setColor(QPalette.WindowText, Qt.white)
+        palette_dark.setColor(QPalette.Base, QColor(25, 25, 25))
+        palette_dark.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+        palette_dark.setColor(QPalette.ToolTipBase, Qt.black)
+        palette_dark.setColor(QPalette.ToolTipText, Qt.white)
+        palette_dark.setColor(QPalette.Text, Qt.white)
+        palette_dark.setColor(QPalette.Button, QColor(53, 53, 53))
+        palette_dark.setColor(QPalette.ButtonText, Qt.white)
+        palette_dark.setColor(QPalette.BrightText, Qt.red)
+        palette_dark.setColor(QPalette.Link, QColor(42, 130, 218))
+        palette_dark.setColor(QPalette.Highlight, QColor(42, 130, 218))
+        palette_dark.setColor(QPalette.HighlightedText, Qt.black)
+        return palette_dark
 
 class ListWidget(QListWidget):
     """ Version of QListWidget that resizes itself.
@@ -103,7 +107,7 @@ class H5PlotGUI(QWidget):
         self.solset_picker = QComboBox()
         for l in self.solset_labels:
             self.solset_picker.addItem(l)
-        #self.solset_picker.activated.connect(self._solset_picker_event)
+        self.solset_picker.activated.connect(self._solset_picker_event)
 
         self.soltab_label_y = QLabel('Plot ')
         self.soltab_label_x = QLabel(' vs ')
@@ -173,3 +177,122 @@ class H5PlotGUI(QWidget):
         layout.addRow(self.plot_all_button)
         layout.addRow(self.station_picker)
 
+    def _axis_picker_event(self):
+        """Callback function for when the x-axis is changed.
+
+        Sets the `axis` attribute to the selected axis
+        """
+        self.logger.debug('Axis changed to: ' + self.axis_picker.currentText())
+        self.axis = self.axis_picker.currentText()
+        if self.axis != 'waterfall':
+            self.plot_all_button.setEnabled(False)
+        else:
+            self.plot_all_button.setEnabled(True)
+
+    def closeEvent(self, event):
+        """ The event triggerd upon closing the main application window.
+        """
+        self.logger.info('Closing all open figures before exiting.')
+        plt.close('all')
+        for f in self.figures:
+            f.close()
+        event.accept()
+
+    def _refant_picker_event(self):
+        """ An even triggered when a new reference antenna is selected.
+
+        Sets the `refant` attribute.
+        """
+        self.logger.debug('Reference antenna changed to: ' + self.refant_picker.currentText())
+        self.refant = self.refant_picker.currentText()
+
+    def _solset_picker_event(self):
+        """Callback function for when the SolSet is changed.
+
+        Sets the `solset` attribute.
+        """
+        solset_prev = self.solset.name
+        self.solset = self.h5parm.getSolset(self.solset_picker.currentText())
+        if self.solset.name == solset_prev:
+            self.logger.debug("Solset unchanged, not reordering")
+            return
+        self.logger.debug('Solset changed to: ' + self.solset_picker.currentText())
+        self.soltab_labels = self.solset.getSoltabNames()
+        self.soltab_picker.clear()
+        for l in self.soltab_labels:
+            self.soltab_picker.addItem(l)
+        self._soltab_picker_event()
+
+    def _soltab_picker_event(self):
+        """Callback function for when the SolTab is changed.
+
+        Sets the `soltab` attribute.
+        """
+        soltab_prev = self.soltab.name
+        self.soltab = self.solset.getSoltab(self.soltab_picker.currentText())
+        if self.soltab.name == soltab_prev:
+            self.logger.debug("Soltab unchanged, not reordering")
+            return
+        self.logger.debug('Soltab changed to: ' + self.soltab_picker.currentText())
+        stations_old = self.stations
+        self.stations = self.soltab.getValues()[1]['ant']
+        if not np.array_equiv(stations_old, self.stations):
+            self.logger.debug('Number of stations changed, updating list.')
+            # The list of stations has changed, update the list.
+            self.station_picker.clear()
+            self.station_picker.addItems(self.stations)
+            self.refant_picker.clear()
+            self.refant_picker.addItems(self.stations)
+        try:
+            self.frequencies = self.soltab.getAxisValues('freq')
+        except TypeError:
+            # Soltab probably has no frequency axis.
+            pass
+        rvals, rweights, raxes = reorder_soltab(self.soltab)
+        self.stcache.update(rvals, raxes, weights=rweights)
+
+    def _dir_picker_event(self):
+        """Callback function for when the direction is changed.
+
+        Sets the `direction` attribute.
+        """
+        self.logger.debug('Direction changed to: ' + self.dir_picker.currentText())
+        self.direction = self.dir_picker.currentIndex()
+
+    def _phasewrap_event(self):
+        """ An even triggered upon switching phase wrapping on or off. (not yet implemented)
+        """
+        self.logger.debug('Phase wrapping changed to ' + str(self.phasewrap_box.isChecked()))
+        self.wrapphase = self.phasewrap_box.isChecked()
+
+    def _plot_button_event(self):
+        """Callback function for when the plot button is pressed.
+
+        Calls the `plot` function subsecquently.
+        """
+        self.logger.debug('Plotting button pressed.')
+        if self.axis == 'freq' or self.axis == 'time':
+            self.plot(labels=(self.axis, self.soltab.name), mode=self.plotmode)
+        elif self.axis == 'waterfall':
+            self.plot_waterfall(labels=('time', 'freq'), mode=self.plotmode)
+
+    def _plot_all_button_event(self):
+        """ Callback function for when the plot all stations button is pressed."""
+        self.logger.debug('Plotting all stations button pressed.')
+        if self.axis == 'freq' or self.axis == 'time':
+            self.plot(labels=(self.axis, self.soltab.name), mode=self.plotmode, plot_all=True)
+        elif self.axis == 'waterfall':
+            self.plot_waterfall(labels=('time', 'freq'), mode=self.plotmode, plot_all=True)
+
+    def _weight_picker_event(self):
+        if self.check_weights.isChecked():
+            self.plotmode = 'weights'
+            self.check_pdiff.setEnabled(False)
+            self.check_fdiff.setEnabled(False)
+            self.check_tdiff.setEnabled(False)
+        else:
+            self.plotmode = 'values'
+            self.check_pdiff.setEnabled(True)
+            self.check_fdiff.setEnabled(True)
+            self.check_tdiff.setEnabled(True)
+        self.logger.info('Plotting {:s}'.format(self.plotmode))
