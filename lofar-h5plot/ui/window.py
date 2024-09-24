@@ -2,9 +2,13 @@ from .widgets import ListWidget
 from ..data import reorder_soltab
 from ..data.cache import SoltabCache
 
-from PySide6.QtWidgets import QWidget
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGridLayout, QLabel, QPushButton, QWidget
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+from PySide6 import QtCore
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QLabel, QPushButton, QScrollBar, QHBoxLayout, QVBoxLayout, QWidget
 
+import logging
 import losoto.h5parm as lh5
 import matplotlib.pyplot as plt
 import numpy as np
@@ -256,3 +260,192 @@ class H5PlotGUI(QWidget):
             self.check_fdiff.setEnabled(True)
             self.check_tdiff.setEnabled(True)
         self.logger.info('Plotting {:s}'.format(self.plotmode))
+
+    def plot_waterfall(self, labels=('x-axis', 'y-axis'), mode='values', plot_all=False):
+        """ Show a two-dimensional waterfall plot of time vs. frequency.
+        """
+        if ('phase_offset') in self.soltab.name:
+            self.logger.info('Phase-offset is scalar and cannot be plotted in 2D.')
+        if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name) or ('faraday' in self.soltab.name) or ('tec' in self.soltab.name)):
+            self.logger.info('Rotation Measure, clock, faraday or TEC cannot be plotted in 2D!')
+            return
+        self.logger.info('Plotting ' + self.soltab.name + \
+                         ' for ' + self.solset.name)
+        antenna = self.station_picker.currentRow()
+        # Data loaded here is xaxis, yaxis, zaxis, isphase
+        print('Loading data')
+        try:
+            #x, y, z, zw, p = msg
+            if hasattr(self, "polarizations"):
+                if len(self.polarizations) > 1 and self.check_pdiff.isChecked():
+                    # Need to plot polarisation difference.
+                    x, y, z1, zw1, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
+                    x2, y2, z2, zw2, p2 = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=-1, direction=self.direction)
+                    z = z1 - z2
+                    # Combine flags of both polarisations.
+                    zw = zw1 * zw2
+                else:
+                    x, y, z, zw, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
+            else:
+                x, y, z, zw, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
+        except ValueError:
+            logging.error('Error loading 2D data!')
+            return
+        if (len(x) == 1) or (len(y) == 1):
+            self.logger.info('Either time or frequency has only 1 entry, not plotting!')
+            return
+        # print('PLOTTING 2D WEIGHTS')
+        try:
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
+        except AttributeError:
+            # No polarizations most likely.
+            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
+        self.figures.append(plot_window)
+        if plot_all:
+            plot_window.plot_all()
+        else:
+            if mode == 'values':
+                zm = np.ma.masked_where(zw == 0, z)
+                plot_window.plot(x, y, zm, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
+            elif mode == 'weights':
+                plot_window.plot(x, y, zw, ax_labels=('Time [s]', 'Freq. [MHz]'), frametitle=self.stations[antenna])
+
+        plot_window.show()
+
+
+class GraphWindow(QDialog):
+    """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
+    """
+    def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, timeslot=0, freqslot=0, direction=0, times=None, freqs=None, parent=None, mode='values', do_timediff=False, do_freqdiff=False, do_poldiff=False):
+        """ Initialize a new GraphWindow instance.
+
+        Args:
+            frametitle (str): title the frame will hvae.
+            antindex (int): the index of the selected antenna.
+            axis (str): the type of axis being plotted (time or freq).
+            timeslot (int): index along the time axis to start with.
+            freqslot (int): index along the frequency axis to start with.
+            direction (str): name of the direction to plot.
+            parent (QDialog): parent window instance.
+        Returns:
+            None
+        """
+        super(GraphWindow, self).__init__()
+        self.setWindowFlags(QtCore.Qt.WindowType.WindowSystemMenuHint | QtCore.Qt.WindowType.WindowMinMaxButtonsHint | QtCore.Qt.WindowType.WindowCloseButtonHint)
+        # Set up for logging output.
+        self.LOGGER = logging.getLogger('GraphWindow')
+        # LOGGER.setLevel(logging.INFO)
+        self.LOGGER.setLevel(logging.DEBUG)
+
+        self.frametitle = frametitle
+        self.axis = axis
+        self.timeslot = 0
+        self.freqslot = 0
+        self.direction = direction
+        self.values = values
+        self.weights = weights
+        self.antindex = antindex
+        self.refantindex = refantindex
+        self.st = st
+        self.parent_window = parent
+        self.mode = mode
+        self.do_timediff = do_timediff
+        self.do_freqdiff = do_freqdiff
+        self.do_poldiff = do_poldiff
+        try:
+            self.frequencies = freqs
+        except AttributeError:
+            # frequencies is None, plotting against time.
+            pass
+
+        try:
+            self.times = times
+            self.times -= self.times[0]
+        except AttributeError:
+            # times is None, plotting against time.
+            pass
+
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.LOGFILEH = logging.FileHandler('h5plot.log')
+        self.LOGFILEH.setLevel(logging.DEBUG)
+        self.LOGFILEH.setFormatter(formatter)
+        self.LOGGER.addHandler(LOGFILEH)
+
+        self.setWindowTitle(frametitle)
+
+        self.button_next = QPushButton('Forward')
+        self.button_next.clicked.connect(self._forward_button_event)
+        self.button_prev = QPushButton('Back')
+        self.button_prev.clicked.connect(self._backward_button_event)
+        self.button_prev.setEnabled(False)
+        if 'time' in axis.lower():
+            try:
+                self.select_label = QLabel('Freq slot {:.2f} MHz'.format(self.frequencies[freqslot] / 1e6))
+                if len(self.frequencies == 1):
+                    self.button_next.setEnabled(False)
+                else:
+                    self.button_next.setEnabled(True)
+            except TypeError:
+                # No frequency axis.
+                self.select_label = QLabel('')
+                self.button_next.setEnabled(False)
+                self.button_prev.setEnabled(False)
+        elif 'freq' in axis.lower():
+            try:
+                self.select_label = QLabel('Time: ' + self.format_time(timeslot))
+                if len(self.times == 1):
+                    self.button_next.setEnabled(False)
+                else:
+                    self.button_next.setEnabled(True)
+            except TypeError:
+                # No time axis.
+                self.select_label = QLabel('')
+                self.button_next.setEnabled(False)
+                self.button_prev.setEnabled(False)
+        self.select_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        self.btn_antiter_next = QPushButton('Next antenna')
+        self.btn_antiter_next.clicked.connect(self._antiter_next_button_event)
+        self.btn_antiter_prev = QPushButton('Previous antenna')
+        self.btn_antiter_prev.clicked.connect(self._antiter_prev_button_event)
+
+        self.btn_diriter_next = QPushButton('Next direction')
+        self.btn_diriter_next.clicked.connect(self._diriter_next_button_event)
+        self.btn_diriter_prev = QPushButton('Previous direction')
+        self.btn_diriter_prev.clicked.connect(self._diriter_prev_button_event)
+
+        antiter_widget = QWidget()
+        antiter_layout = QHBoxLayout(antiter_widget)
+        antiter_layout.addWidget(self.btn_antiter_prev)
+        antiter_layout.addWidget(self.btn_antiter_next)
+        antiter_layout.addWidget(self.btn_diriter_prev)
+        antiter_layout.addWidget(self.btn_diriter_next)
+
+        self.buttons = QGridLayout()
+        self.buttons.addWidget(self.button_prev, 0, 0)
+        self.buttons.addWidget(self.select_label, 0, 1)
+        self.buttons.addWidget(self.button_next, 0, 2)
+
+        self.scrolls = QGridLayout()
+        self.scrollbar = QScrollBar()
+        self.scrollbar.setOrientation(QtCore.Qt.Orientation.Horizontal)
+        if 'time' in axis.lower() and self.frequencies is not None:
+            self.scrollbar.setRange(0, len(self.frequencies)-1)
+        elif 'freq' in axis.lower()  and self.times is not None:
+            self.scrollbar.setRange(0, len(self.times)-1)
+        else:
+            self.scrollbar.setDisabled(True)
+        self.scrollbar.valueChanged.connect(self._scrollbar_event)
+        self.scrolls.addWidget(self.scrollbar, 0, 0)
+
+        self.fig = Figure()
+        self.canvas = FigureCanvas(self.fig)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+
+        self.window_layout = QVBoxLayout()
+        self.window_layout.addWidget(self.toolbar)
+        self.window_layout.addWidget(self.canvas, stretch=500)
+        self.window_layout.addItem(self.buttons)
+        self.window_layout.addItem(self.scrolls)
+        self.window_layout.addWidget(antiter_widget)
+        self.setLayout(self.window_layout)

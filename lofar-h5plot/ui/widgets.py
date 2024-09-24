@@ -1,6 +1,6 @@
 """ Module to hold UI related code """
 from PySide6 import QtCore, QtWidgets
-from PySide6.QtGui import QPalette, QColor
+from PySide6.QtGui import QPalette, QColor, QColorConstants
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QListWidget
 
@@ -10,19 +10,19 @@ from PySide6.QtWidgets import QListWidget
 class ColourPalette:
     def get_palette_dark(self):
         palette_dark = QPalette()
-        palette_dark.setColor(QPalette.Window, QColor(53, 53, 53))
-        palette_dark.setColor(QPalette.WindowText, Qt.white)
-        palette_dark.setColor(QPalette.Base, QColor(25, 25, 25))
-        palette_dark.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-        palette_dark.setColor(QPalette.ToolTipBase, Qt.black)
-        palette_dark.setColor(QPalette.ToolTipText, Qt.white)
-        palette_dark.setColor(QPalette.Text, Qt.white)
-        palette_dark.setColor(QPalette.Button, QColor(53, 53, 53))
-        palette_dark.setColor(QPalette.ButtonText, Qt.white)
-        palette_dark.setColor(QPalette.BrightText, Qt.red)
-        palette_dark.setColor(QPalette.Link, QColor(42, 130, 218))
-        palette_dark.setColor(QPalette.Highlight, QColor(42, 130, 218))
-        palette_dark.setColor(QPalette.HighlightedText, Qt.black)
+        palette_dark.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+        palette_dark.setColor(QPalette.ColorRole.WindowText, QColorConstants.White)
+        palette_dark.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
+        palette_dark.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+        palette_dark.setColor(QPalette.ColorRole.ToolTipBase, QColorConstants.Black)
+        palette_dark.setColor(QPalette.ColorRole.ToolTipText, QColorConstants.White)
+        palette_dark.setColor(QPalette.ColorRole.Text, QColorConstants.White)
+        palette_dark.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+        palette_dark.setColor(QPalette.ColorRole.ButtonText, QColorConstants.White)
+        palette_dark.setColor(QPalette.ColorRole.BrightText, QColorConstants.Red)
+        palette_dark.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
+        palette_dark.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+        palette_dark.setColor(QPalette.ColorRole.HighlightedText, QColorConstants.Black)
         return palette_dark
 
 class ListWidget(QListWidget):
@@ -32,8 +32,9 @@ class ListWidget(QListWidget):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        self.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
 
 
     def minimumSizeHint(self) -> QtCore.QSize:
