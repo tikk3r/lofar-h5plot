@@ -89,10 +89,6 @@ class H5PlotGUI(QWidget):
         self.refant_picker.addItems(self.stations)
         self.refant_picker.activated.connect(self._refant_picker_event)
 
-        # self.phasewrap_box = QCheckBox('Wrap Phases')
-        # self.phasewrap_box.setChecked(True)
-        # self.phasewrap_box.setEnabled(False)
-        # self.phasewrap_box.stateChanged.connect(self._phasewrap_event)
         self.dir_label = QLabel('Dir.')
         self.dir_picker = QComboBox()
         self.dir_picker.addItems(self.directions)
@@ -223,12 +219,6 @@ class H5PlotGUI(QWidget):
         self.logger.debug('Direction changed to: ' + self.dir_picker.currentText())
         self.direction = self.dir_picker.currentIndex()
 
-    def _phasewrap_event(self):
-        """ An even triggered upon switching phase wrapping on or off. (not yet implemented)
-        """
-        self.logger.debug('Phase wrapping changed to ' + str(self.phasewrap_box.isChecked()))
-        self.wrapphase = self.phasewrap_box.isChecked()
-
     def _plot_button_event(self):
         """Callback function for when the plot button is pressed.
 
@@ -261,57 +251,12 @@ class H5PlotGUI(QWidget):
             self.check_tdiff.setEnabled(True)
         self.logger.info('Plotting {:s}'.format(self.plotmode))
 
+    def plot(self, labels=None, mode=None, plot_all=False):
+        pass
+
     def plot_waterfall(self, labels=('x-axis', 'y-axis'), mode='values', plot_all=False):
-        """ Show a two-dimensional waterfall plot of time vs. frequency.
-        """
-        if ('phase_offset') in self.soltab.name:
-            self.logger.info('Phase-offset is scalar and cannot be plotted in 2D.')
-        if (('rotationmeasure' in self.soltab.name) or ('RMextract' in self.soltab.name) or ('clock' in self.soltab.name) or ('faraday' in self.soltab.name) or ('tec' in self.soltab.name)):
-            self.logger.info('Rotation Measure, clock, faraday or TEC cannot be plotted in 2D!')
-            return
-        self.logger.info('Plotting ' + self.soltab.name + \
-                         ' for ' + self.solset.name)
-        antenna = self.station_picker.currentRow()
-        # Data loaded here is xaxis, yaxis, zaxis, isphase
-        print('Loading data')
-        try:
-            #x, y, z, zw, p = msg
-            if hasattr(self, "polarizations"):
-                if len(self.polarizations) > 1 and self.check_pdiff.isChecked():
-                    # Need to plot polarisation difference.
-                    x, y, z1, zw1, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
-                    x2, y2, z2, zw2, p2 = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=-1, direction=self.direction)
-                    z = z1 - z2
-                    # Combine flags of both polarisations.
-                    zw = zw1 * zw2
-                else:
-                    x, y, z, zw, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
-            else:
-                x, y, z, zw, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
-        except ValueError:
-            logging.error('Error loading 2D data!')
-            return
-        if (len(x) == 1) or (len(y) == 1):
-            self.logger.info('Either time or frequency has only 1 entry, not plotting!')
-            return
-        # print('PLOTTING 2D WEIGHTS')
-        try:
-            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
-        except AttributeError:
-            # No polarizations most likely.
-            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
-        self.figures.append(plot_window)
-        if plot_all:
-            plot_window.plot_all()
-        else:
-            if mode == 'values':
-                zm = np.ma.masked_where(zw == 0, z)
-                plot_window.plot(x, y, zm, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p, frametitle=self.stations[antenna])
-            elif mode == 'weights':
-                plot_window.plot(x, y, zw, ax_labels=('Time [s]', 'Freq. [MHz]'), frametitle=self.stations[antenna])
 
-        plot_window.show()
-
+        pass
 
 class GraphWindow(QDialog):
     """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
@@ -369,7 +314,7 @@ class GraphWindow(QDialog):
         self.LOGFILEH = logging.FileHandler('h5plot.log')
         self.LOGFILEH.setLevel(logging.DEBUG)
         self.LOGFILEH.setFormatter(formatter)
-        self.LOGGER.addHandler(LOGFILEH)
+        self.LOGGER.addHandler(self.LOGFILEH)
 
         self.setWindowTitle(frametitle)
 
@@ -449,3 +394,43 @@ class GraphWindow(QDialog):
         self.window_layout.addItem(self.scrolls)
         self.window_layout.addWidget(antiter_widget)
         self.setLayout(self.window_layout)
+
+    def _antiter_next_button_event(self):
+        raise NotImplementedError
+
+    def _antiter_prev_button_event(self):
+        raise NotImplementedError
+
+    def _forward_button_event(self):
+        raise NotImplementedError
+
+    def _backward_button_event(self):
+        raise NotImplementedError
+
+    def _diriter_next_button_event(self):
+        raise NotImplementedError
+
+    def _diriter_prev_button_event(self):
+        raise NotImplementedError
+
+    def _scrollbar_event(self):
+        raise NotImplementedError
+
+    def format_time(self, seconds):
+        """ Formats the time to be displayed in the plotting windows.
+
+        A string is formatted, displaying the time in seconds or (fractional) minutes or hours.
+
+        Args:
+            seconds (int): the time in seconds.
+        Returns:
+            formatted time (str): formatted time string.
+        """
+        if seconds < 60:
+            return '{:.3f} sec'.format(seconds)
+        elif 60 <= seconds < 3600:
+            return '{:.3f} min'.format(seconds / 60)
+        elif seconds >= 3600:
+            return '{:.3f} hr'.format(seconds / 3600)
+        else:
+            return '{:.3f}'.format(seconds)
