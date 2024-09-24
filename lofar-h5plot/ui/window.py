@@ -1,3 +1,8 @@
+from enum import Enum, EnumType
+from typing import Optional
+
+from tables import TimeCol
+
 from .widgets import ListWidget
 from ..data import reorder_soltab
 from ..data.cache import SoltabCache
@@ -26,6 +31,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+class PlotAxis(Enum):
+    Time = "time"
+    Frequency = "frequency"
+    Waterfall = "waterfall"
+
+
+class PlotMode(Enum):
+    Value = "values"
+    Weight = "weights"
+
+
 def try_get_axis(soltab, axis):
     try:
         return soltab.getAxisValues(axis)
@@ -39,7 +55,7 @@ class H5PlotGUI(QWidget):
     From here the SolSets, SolTabs and antennas to plot are selected.
     """
 
-    def __init__(self, h5file, logging_instance, parent=None):
+    def __init__(self, h5file: str, logging_instance: logging.Logger, parent=None):
         """Initialize a new instances of the H5PlotGUI.
 
         Args:
@@ -102,9 +118,9 @@ class H5PlotGUI(QWidget):
             self.soltab_picker.addItem(l)
         self.soltab_picker.activated.connect(self._soltab_picker_event)
         self.axis_picker = QComboBox()
-        self.axis_picker.addItems(["time", "freq", "waterfall"])
+        self.axis_picker.addItems([a.value for a in PlotAxis])
         self.axis_picker.activated.connect(self._axis_picker_event)
-        self.axis = "time"
+        self.axis: PlotAxis = PlotAxis.Time
 
         self.refant_label = QLabel("Ref. Ant. ")
         self.refant_picker = QComboBox()
@@ -128,7 +144,7 @@ class H5PlotGUI(QWidget):
         self.checkbox_layout.addWidget(self.check_fdiff, 1, 1)
         self.checkbox_layout.addWidget(self.check_pdiff, 1, 0)
 
-        self.plotmode = "values"
+        self.plotmode: PlotMode = PlotMode.Value
 
         self.plot_button = QPushButton("Plot")
         self.plot_button.clicked.connect(self._plot_button_event)
@@ -169,7 +185,15 @@ class H5PlotGUI(QWidget):
         Sets the `axis` attribute to the selected axis
         """
         self.logger.debug("Axis changed to: " + self.axis_picker.currentText())
-        self.axis = self.axis_picker.currentText()
+        match self.axis_picker.currentText():
+            case "time":
+                self.axis = PlotAxis.Time
+            case "frequency":
+                self.axis = PlotAxis.Frequency
+            case "waterfall":
+                self.axis = PlotAxis.Waterfall
+            case _:
+                raise ValueError("Invalid value for axis encountered.")
         if self.axis != "waterfall":
             self.plot_all_button.setEnabled(False)
         else:
@@ -253,7 +277,7 @@ class H5PlotGUI(QWidget):
         """
         self.logger.debug("Plotting button pressed.")
         if self.axis == "freq" or self.axis == "time":
-            self.plot(labels=(self.axis, self.soltab.name), mode=self.plotmode)
+            self.plot(labels=[self.axis.value, self.soltab.name], mode=self.plotmode)
         elif self.axis == "waterfall":
             self.plot_waterfall(labels=("time", "freq"), mode=self.plotmode)
 
@@ -262,7 +286,7 @@ class H5PlotGUI(QWidget):
         self.logger.debug("Plotting all stations button pressed.")
         if self.axis == "freq" or self.axis == "time":
             self.plot(
-                labels=(self.axis, self.soltab.name), mode=self.plotmode, plot_all=True
+                labels=[self.axis.value, self.soltab.name], mode=self.plotmode, plot_all=True
             )
         elif self.axis == "waterfall":
             self.plot_waterfall(
@@ -271,18 +295,23 @@ class H5PlotGUI(QWidget):
 
     def _weight_picker_event(self):
         if self.check_weights.isChecked():
-            self.plotmode = "weights"
+            self.plotmode = PlotMode.Weight
             self.check_pdiff.setEnabled(False)
             self.check_fdiff.setEnabled(False)
             self.check_tdiff.setEnabled(False)
         else:
-            self.plotmode = "values"
+            self.plotmode = PlotMode.Value
             self.check_pdiff.setEnabled(True)
             self.check_fdiff.setEnabled(True)
             self.check_tdiff.setEnabled(True)
         self.logger.info("Plotting {:s}".format(self.plotmode))
 
-    def plot(self, labels=None, mode=None, plot_all=False):
+    def plot(
+        self,
+        labels: Optional[list[str]] = None,
+        mode: Optional[PlotMode] = None,
+        plot_all: bool = False,
+    ):
         gw = GraphWindow(
             values=self.stcache.values,
             weights=self.stcache.weights,
@@ -293,10 +322,14 @@ class H5PlotGUI(QWidget):
             st=self.soltab,
             times=self.times,
         )
+        self.figures.append(gw)
         gw.show()
 
     def plot_waterfall(
-        self, labels=("x-axis", "y-axis"), mode="values", plot_all=False
+        self,
+        labels=("x-axis", "y-axis"),
+        mode: PlotMode = PlotMode.Value,
+        plot_all=False,
     ):
         pass
 
@@ -311,7 +344,7 @@ class GraphWindow(QDialog):
         frametitle,
         antindex,
         refantindex,
-        axis,
+        axis: PlotAxis,
         st,
         timeslot=0,
         freqslot=0,
@@ -391,32 +424,35 @@ class GraphWindow(QDialog):
         self.button_prev = QPushButton("Back")
         self.button_prev.clicked.connect(self._backward_button_event)
         self.button_prev.setEnabled(False)
-        if "time" in axis.lower():
-            try:
-                self.select_label = QLabel(
-                    "Freq slot {:.2f} MHz".format(self.frequencies[freqslot] / 1e6)
-                )
-                if len(self.frequencies == 1):
+        match axis:
+            case PlotAxis.Time:
+                try:
+                    self.select_label = QLabel(
+                        "Freq slot {:.2f} MHz".format(self.frequencies[freqslot] / 1e6)
+                    )
+                    if len(self.frequencies == 1):
+                        self.button_next.setEnabled(False)
+                    else:
+                        self.button_next.setEnabled(True)
+                except TypeError:
+                    # No frequency axis.
+                    self.select_label = QLabel("")
                     self.button_next.setEnabled(False)
-                else:
-                    self.button_next.setEnabled(True)
-            except TypeError:
-                # No frequency axis.
-                self.select_label = QLabel("")
-                self.button_next.setEnabled(False)
-                self.button_prev.setEnabled(False)
-        elif "freq" in axis.lower():
-            try:
-                self.select_label = QLabel("Time: " + self.format_time(timeslot))
-                if len(self.times == 1):
+                    self.button_prev.setEnabled(False)
+            case PlotAxis.Frequency:
+                try:
+                    self.select_label = QLabel("Time: " + self.format_time(timeslot))
+                    if len(self.times == 1):
+                        self.button_next.setEnabled(False)
+                    else:
+                        self.button_next.setEnabled(True)
+                except TypeError:
+                    # No time axis.
+                    self.select_label = QLabel("")
                     self.button_next.setEnabled(False)
-                else:
-                    self.button_next.setEnabled(True)
-            except TypeError:
-                # No time axis.
-                self.select_label = QLabel("")
-                self.button_next.setEnabled(False)
-                self.button_prev.setEnabled(False)
+                    self.button_prev.setEnabled(False)
+            case PlotAxis.Waterfall:
+                raise ValueError(f"'waterfall' is an unexpected value for 1D plots. This shouldn't have happened and is likely a bug.")
         self.select_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
         self.btn_antiter_next = QPushButton("Next antenna")
@@ -444,9 +480,9 @@ class GraphWindow(QDialog):
         self.scrolls = QGridLayout()
         self.scrollbar = QScrollBar()
         self.scrollbar.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        if "time" in axis.lower() and self.frequencies is not None:
+        if (axis is PlotAxis.Time) and self.frequencies is not None:
             self.scrollbar.setRange(0, len(self.frequencies) - 1)
-        elif "freq" in axis.lower() and self.times is not None:
+        elif (axis is PlotAxis.Frequency) and self.times is not None:
             self.scrollbar.setRange(0, len(self.times) - 1)
         else:
             self.scrollbar.setDisabled(True)
