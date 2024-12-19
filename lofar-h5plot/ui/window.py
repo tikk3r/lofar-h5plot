@@ -4,7 +4,7 @@ from typing import Optional
 from tables import TimeCol
 
 from .widgets import ListWidget
-from ..data import read_values_from_soltab
+from ..data import get_axis_permutation, read_values_from_soltab
 from ..data.cache import SoltabCache
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -556,15 +556,16 @@ class GraphWindow(QDialog):
 
     def plot(self):
         vals = read_values_from_soltab(self.st, self.timeslot, self.antindex, self.freqslot, 0, self.direction)
-        print(vals.shape)
+        permutation = get_axis_permutation(self.st)
+        values = np.transpose(self.values[0], permutation)
         self.fig.clf()
         self.ax = self.fig.add_subplot(111)
         self.ax.clear()
         
         if self.axis is PlotAxis.Time:
             self.ax.set_xlabel("Time [s]")
-            self.ax.plot(vals[:, self.freqslot, self.antindex, 0])
+            self.ax.plot(self.values[1]["time"], values[:, self.freqslot, self.antindex, :])
         elif self.axis is PlotAxis.Frequency:
             self.ax.set_xlabel("Frequency [MHz]")
-            self.ax.plot(vals[self.timeslot, :, self.antindex, 0])
+            self.ax.plot(self.values[1]["freq"] / 1e6, values[self.timeslot, :, self.antindex, :])
         self.canvas.draw()
