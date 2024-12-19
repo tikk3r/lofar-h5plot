@@ -4,7 +4,7 @@ from typing import Optional
 from tables import TimeCol
 
 from .widgets import ListWidget
-from ..data import reorder_soltab
+from ..data import read_values_from_soltab
 from ..data.cache import SoltabCache
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -99,8 +99,8 @@ class H5PlotGUI(QWidget):
             self.soltab.getAxesNames(),
             weights=self.soltab.getValues(weight=True)[0],
         )
-        rvals, rweights, raxes = reorder_soltab(self.soltab)
-        self.stcache.update(rvals, raxes, weights=rweights)
+        #rvals, rweights, raxes = reorder_soltab(self.soltab)
+        #self.stcache.update(rvals, raxes, weights=rweights)
 
         self.move(300, 300)
         self.setWindowTitle("H5Plot")
@@ -259,8 +259,8 @@ class H5PlotGUI(QWidget):
         except TypeError:
             # Soltab probably has no frequency axis.
             pass
-        rvals, rweights, raxes = reorder_soltab(self.soltab)
-        self.stcache.update(rvals, raxes, weights=rweights)
+        #rvals, rweights, raxes = reorder_soltab(self.soltab)
+        #self.stcache.update(rvals, raxes, weights=rweights)
 
     def _dir_picker_event(self):
         """Callback function for when the direction is changed.
@@ -276,9 +276,9 @@ class H5PlotGUI(QWidget):
         Calls the `plot` function subsecquently.
         """
         self.logger.debug("Plotting button pressed.")
-        if self.axis == "freq" or self.axis == "time":
+        if self.axis is PlotAxis.Frequency or self.axis == PlotAxis.Time:
             self.plot(labels=[self.axis.value, self.soltab.name], mode=self.plotmode)
-        elif self.axis == "waterfall":
+        elif self.axis is PlotAxis.Waterfall:
             self.plot_waterfall(labels=("time", "freq"), mode=self.plotmode)
 
     def _plot_all_button_event(self):
@@ -321,7 +321,9 @@ class H5PlotGUI(QWidget):
             axis=self.axis,
             st=self.soltab,
             times=self.times,
+            parent=self
         )
+        gw.plot()
         self.figures.append(gw)
         gw.show()
 
@@ -348,11 +350,12 @@ class GraphWindow(QDialog):
         st,
         timeslot=0,
         freqslot=0,
+        polslot=0,
         direction=0,
-        times=None,
-        freqs=None,
+        times: Optional[np.ndarray] = None,
+        freqs: Optional[np.ndarray] = None,
         parent=None,
-        mode="values",
+        mode: PlotMode = PlotMode.Value,
         do_timediff=False,
         do_freqdiff=False,
         do_poldiff=False,
@@ -365,6 +368,7 @@ class GraphWindow(QDialog):
             axis (str): the type of axis being plotted (time or freq).
             timeslot (int): index along the time axis to start with.
             freqslot (int): index along the frequency axis to start with.
+            polslot (int): index along the polarisation axis to start with.
             direction (str): name of the direction to plot.
             parent (QDialog): parent window instance.
         Returns:
@@ -383,8 +387,9 @@ class GraphWindow(QDialog):
 
         self.frametitle = frametitle
         self.axis = axis
-        self.timeslot = 0
-        self.freqslot = 0
+        self.timeslot = timeslot
+        self.freqslot = freqslot
+        self.polslot = polslot
         self.direction = direction
         self.values = values
         self.weights = weights
@@ -502,10 +507,18 @@ class GraphWindow(QDialog):
         self.setLayout(self.window_layout)
 
     def _antiter_next_button_event(self):
-        raise NotImplementedError
+        if (self.antindex + 1) < len(self.parent_window.stations):
+            self.antindex += 1
+        else:
+            self.antindex = 0
+        self.plot()
 
     def _antiter_prev_button_event(self):
-        raise NotImplementedError
+        if (self.antindex - 1) >= 0:
+            self.antindex -= 1
+        else:
+            self.antindex = len(self.parent_window.stations) - 1
+        self.plot()
 
     def _forward_button_event(self):
         raise NotImplementedError
@@ -540,3 +553,18 @@ class GraphWindow(QDialog):
             return "{:.3f} hr".format(seconds / 3600)
         else:
             return "{:.3f}".format(seconds)
+
+    def plot(self):
+        vals = read_values_from_soltab(self.st, self.timeslot, self.antindex, self.freqslot, 0, self.direction)
+        print(vals.shape)
+        self.fig.clf()
+        self.ax = self.fig.add_subplot(111)
+        self.ax.clear()
+        
+        if self.axis is PlotAxis.Time:
+            self.ax.set_xlabel("Time [s]")
+            self.ax.plot(vals[:, self.freqslot, self.antindex, 0])
+        elif self.axis is PlotAxis.Frequency:
+            self.ax.set_xlabel("Frequency [MHz]")
+            self.ax.plot(vals[self.timeslot, :, self.antindex, 0])
+        self.canvas.draw()
