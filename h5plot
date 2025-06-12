@@ -1500,6 +1500,9 @@ class H5PlotGUI(QWidget):
             self.logger.info('Either time or frequency has only 1 entry, not plotting!')
             return
         # print('PLOTTING 2D WEIGHTS')
+        tempvals = self.stcache.values[0]
+        tempvals = np.where(self.stcache.weights, tempvals, np.nan)
+        self.stcache.values = (tempvals, self.stcache.values[1])
         try:
             plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, int(np.argwhere(self.stations == self.refant)), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.check_pdiff.isChecked())
         except AttributeError:
