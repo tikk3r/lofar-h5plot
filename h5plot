@@ -891,6 +891,7 @@ class GraphWindow2D(QDialog):
             x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
         self.frametitle = self.parent.stations[self.antindex]
         if self.mode == 'values':
+            z = np.where(zw, z, np.nan)
             self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
         elif self.mode == 'weights':
             self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
@@ -913,6 +914,7 @@ class GraphWindow2D(QDialog):
             x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
         self.frametitle = self.parent.stations[self.antindex]
         if self.mode == 'values':
+            z = np.where(zw, z, np.nan)
             self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
         elif self.mode == 'weights':
             self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
