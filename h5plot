@@ -1322,7 +1322,10 @@ class H5PlotGUI(QWidget):
             # Probably normal string.
             self.directions = [s for s in self.solset.getSou().keys()]
         self.direction = 0
-        self.refant = self.stations[0]
+        if "ST001" in self.stations:
+            self.refant = self.stations[self.stations == "ST001"]
+        else:
+            self.refant = self.stations[0]
         self.wrapphase = True
 
         self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames(), weights=self.soltab.getValues(weight=True)[0])
@@ -1353,6 +1356,8 @@ class H5PlotGUI(QWidget):
         self.refant_picker = QComboBox()
         self.refant_picker.addItems(self.stations)
         self.refant_picker.activated.connect(self._refant_picker_event)
+        if "ST001" in self.stations:
+            self.refant_picker.setCurrentIndex(np.argwhere(self.stations == "ST001")[0][0])
 
         # self.phasewrap_box = QCheckBox('Wrap Phases')
         # self.phasewrap_box.setChecked(True)
