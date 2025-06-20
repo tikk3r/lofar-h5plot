@@ -873,7 +873,10 @@ class GraphWindow2D(QDialog):
         if self.do_poldiff:
             self.button_prev.setEnabled(False)
             self.button_next.setEnabled(False)
-            self.select_label.setText('Corr.: {:s} - {:s}'.format(self.polarizations[0], self.polarizations[-1]))
+            if self.poldifmode == PoldifMode.PARALLEL:
+                self.select_label.setText('Corr.: {:s} - {:s}'.format(self.polarizations[0], self.polarizations[-1]))
+            elif self.poldifmode == PoldifMode.CROSS:
+                self.select_label.setText('Corr.: {:s} - {:s}'.format(self.polarizations[1], self.polarizations[2]))
             return
 
     def format_time(self, seconds):
@@ -1562,10 +1565,15 @@ class H5PlotGUI(QWidget):
         try:
             #x, y, z, zw, p = msg
             if hasattr(self, "polarizations"):
-                if len(self.polarizations) > 1 and self.check_pdiff.isChecked():
-                    # Need to plot polarisation difference.
-                    x, y, z1, zw1, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
-                    x2, y2, z2, zw2, p2 = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=-1, direction=self.direction)
+                if len(self.polarizations) > 1 and self.do_poldiff:
+                    if self.poldifmode == PoldifMode.PARALLEL:
+                        # Need to plot polarisation difference.
+                        x, y, z1, zw1, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=0, direction=self.direction)
+                        x2, y2, z2, zw2, p2 = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=-1, direction=self.direction)
+                    elif self.poldifmode == PoldifMode.CROSS:
+                        # Need to plot polarisation difference.
+                        x, y, z1, zw1, p = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=1, direction=self.direction)
+                        x2, y2, z2, zw2, p2 = load_axes_2d(self.stcache.values, self.stcache.weights, self.soltab, antenna=antenna, refantenna=int(np.argwhere(self.stations == self.refant)), pol=2, direction=self.direction)
                     z = z1 - z2
                     # Combine flags of both polarisations.
                     zw = zw1 * zw2
