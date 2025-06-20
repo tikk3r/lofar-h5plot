@@ -459,7 +459,7 @@ class GraphWindow(QDialog):
         self.setWindowTitle(self.frametitle)
 
     def _antiter_prev_button_event(self):
-        if (self.antindex - 1) > 0:
+        if (self.antindex - 1) >= 0:
             self.antindex -= 1
         else:
             self.antindex = len(self.parent.stations) - 1
@@ -483,7 +483,7 @@ class GraphWindow(QDialog):
 
     def _diriter_prev_button_event(self):
         diridx = self.parent.directions.index(self.direction)
-        if (diridx - 1) > 0:
+        if (diridx - 1) >= 0:
             diridx -= 1
         else:
             diridx = -1
@@ -927,7 +927,7 @@ class GraphWindow2D(QDialog):
         self.setWindowTitle(self.frametitle)
 
     def _antiter_prev_button_event(self):
-        if (self.antindex - 1) > 0:
+        if (self.antindex - 1) >= 0:
             self.antindex -= 1
         else:
             self.antindex = len(self.parent.stations) - 1
@@ -988,7 +988,7 @@ class GraphWindow2D(QDialog):
 
     def _diriter_prev_button_event(self):
         diridx = self.parent.directions.index(self.direction)
-        if (diridx - 1) > 0:
+        if (diridx - 1) >= 0:
             diridx -= 1
         else:
             diridx = -1
