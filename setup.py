@@ -22,6 +22,7 @@ setuptools.setup(
     python_requires='>=3.9',
     install_requires=[
         'PyQt5',
+        'losoto',
         'matplotlib',
         'numpy',
     ],
