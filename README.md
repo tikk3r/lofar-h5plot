@@ -29,7 +29,7 @@ After this, it can simply be run as:
 * LoSoTo 2.0
 * Matplotlib
 * Numpy
-* PyQt5
+* PySide6 on Linux arm64. PyQt5 has no wheel there. Other machines use PyQt5.
 
 These can be installed on Ubuntu through
 
