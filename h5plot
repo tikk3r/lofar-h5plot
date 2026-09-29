@@ -18,7 +18,7 @@ else:
     os.environ.setdefault("QT_API", "pyqt5")
 
 from qtpy.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
-    QLineEdit, QListWidget, QPushButton, QScrollBar, QVBoxLayout, QWidget
+    QLineEdit, QListWidget, QPushButton, QScrollBar, QSpinBox, QVBoxLayout, QWidget
 from qtpy import QtCore, QtGui, QtWidgets
 
 from losoto.lib_operations import reorderAxes
