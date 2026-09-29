@@ -1707,7 +1707,8 @@ class GraphWindow2D(QDialog):
                 Nplotted += 1
         cbar_ax = self.fig.add_axes([0.955, grid_bottom, 0.015, grid_top - grid_bottom])
         self.fig.colorbar(im, cax=cbar_ax)
-        self.setWindowState(QtCore.Qt.WindowMaximized)
+        if not self.isVisible():
+            self.setWindowState(QtCore.Qt.WindowMaximized)
         self.btn_antiter_prev.setEnabled(self.nxm_dimensions is not None and self.antindex > 0)
         self.btn_antiter_next.setEnabled(
             self.nxm_dimensions is not None
