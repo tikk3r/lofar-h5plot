@@ -4,11 +4,19 @@
 __version__ = 'v2.9.5'
 from enum import Enum
 
+import contextlib
+import copy
+import datetime
+import functools
+import itertools
 import logging
+import math
 import os
+import shutil
 import signal
 import sys
 import time
+import types
 
 # PyQt5 has no Linux arm64 wheel. PySide6 does, and qtpy keeps
 # the Qt5 names used below.
@@ -17,13 +25,24 @@ if sys.platform == "linux" and os.uname().machine == "aarch64":
 else:
     os.environ.setdefault("QT_API", "pyqt5")
 
-from qtpy.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
-    QLineEdit, QListWidget, QPushButton, QScrollBar, QSpinBox, QVBoxLayout, QWidget
-from qtpy import QtCore, QtGui, QtWidgets
+try:
+    from qtpy.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
+        QLineEdit, QListWidget, QPushButton, QScrollBar, QSpinBox, QVBoxLayout, QWidget
+    from qtpy import QtCore, QtGui, QtWidgets
+except ModuleNotFoundError as exc:
+    if exc.name != 'qtpy':
+        raise
+    os.environ["QT_API"] = "pyqt5"
+    from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, \
+        QLineEdit, QListWidget, QPushButton, QScrollBar, QSpinBox, QVBoxLayout, QWidget
+    from PyQt5 import QtCore, QtGui, QtWidgets
+    QT_API = "pyqt5"
+else:
+    QT_API = os.environ["QT_API"]
 
 from losoto.lib_operations import reorderAxes
 import matplotlib
-if os.environ["QT_API"] == "pyside6":
+if QT_API == "pyside6":
     matplotlib.use("QtAgg")
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -32,15 +51,339 @@ else:
     from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
+from matplotlib.gridspec import GridSpec
+import matplotlib.patheffects as patheffects
 from matplotlib.patches import Rectangle
 from matplotlib.widgets import RectangleSelector
 
 import losoto.h5parm as lh5
 import matplotlib.pyplot as plt
 import numpy as np
+try:
+    import colormaps as cmaps
+except ModuleNotFoundError as exc:
+    if exc.name != 'colormaps':
+        raise
+    cmaps = None
+
+# CET_C6 samples from HoloViz Colorcet, based on Peter Kovesi's colormap.
+# Reproduced under CC BY 4.0: https://github.com/holoviz/colorcet/blob/main/LICENSE.txt
+_CET_C6_RGB = np.fromstring("""
+0.96726 0.21404 0.10285
+0.96657 0.21983 0.0919
+0.96633 0.22834 0.081637
+0.96652 0.23917 0.071996
+0.9671 0.25198 0.063086
+0.96804 0.26633 0.054632
+0.96927 0.28187 0.046867
+0.97077 0.29827 0.039573
+0.97247 0.31531 0.032902
+0.97433 0.33274 0.027416
+0.9763 0.35036 0.022767
+0.97835 0.36807 0.018802
+0.98044 0.38577 0.015391
+0.98254 0.40339 0.012442
+0.98463 0.42085 0.009625
+0.98667 0.43815 0.007288
+0.98867 0.45524 0.005171
+0.99061 0.47213 0.003222
+0.99248 0.4888 0.001403
+0.99427 0.50528 0
+0.99598 0.52156 0
+0.99761 0.53767 0
+0.99914 0.55359 0
+1 0.56934 0
+1 0.58494 0
+1 0.60037 0
+1 0.61565 0
+1 0.63077 0
+1 0.64572 0
+1 0.66048 0
+1 0.67504 0
+1 0.68935 0
+1 0.70336 0
+1 0.71701 0
+1 0.73023 0
+1 0.74293 0
+0.99701 0.75501 0
+0.99313 0.76637 0
+0.98833 0.77691 0
+0.98256 0.78651 0
+0.97574 0.79507 0
+0.96785 0.80251 0
+0.95886 0.80875 0
+0.94877 0.81373 0
+0.93761 0.81743 0
+0.92543 0.81985 0
+0.91229 0.821 0
+0.89826 0.82095 0
+0.88344 0.81974 0
+0.86793 0.8175 0
+0.8518 0.8143 0
+0.83517 0.81025 0
+0.81812 0.80549 0
+0.80073 0.8001 0
+0.78306 0.7942 0
+0.76518 0.78786 0
+0.74713 0.7812 0
+0.72895 0.77426 0
+0.71067 0.76712 0
+0.69231 0.75982 0
+0.67387 0.7524 0
+0.65537 0.74489 0
+0.63682 0.73731 0
+0.61821 0.72968 0
+0.59952 0.722 0
+0.58077 0.7143 8.8e-05
+0.56197 0.7066 0.001364
+0.54309 0.69889 0.002744
+0.52413 0.69121 0.004275
+0.50511 0.68355 0.006019
+0.48603 0.67593 0.008055
+0.46689 0.66839 0.010459
+0.4477 0.66094 0.013625
+0.42851 0.65363 0.017232
+0.40933 0.6465 0.021673
+0.39021 0.63962 0.027147
+0.37122 0.63303 0.033854
+0.35244 0.62683 0.042288
+0.33395 0.62109 0.05131
+0.31583 0.61589 0.06103
+0.29817 0.61133 0.071492
+0.28114 0.60749 0.082491
+0.26486 0.60444 0.094141
+0.24945 0.60226 0.10646
+0.23509 0.60102 0.11935
+0.22182 0.60075 0.13293
+0.20988 0.60148 0.14712
+0.19934 0.60321 0.16196
+0.19034 0.60592 0.17737
+0.18291 0.60959 0.19335
+0.17711 0.61414 0.20988
+0.17287 0.61953 0.22692
+0.17015 0.62567 0.24439
+0.16879 0.63248 0.2623
+0.16861 0.63987 0.28053
+0.16945 0.64776 0.2991
+0.17103 0.65608 0.31789
+0.17321 0.66474 0.3369
+0.17578 0.67369 0.35607
+0.17862 0.68287 0.37537
+0.18147 0.69224 0.39479
+0.18433 0.70173 0.4143
+0.18705 0.71136 0.43387
+0.18954 0.72106 0.45351
+0.19176 0.73084 0.4732
+0.19369 0.74067 0.49294
+0.19522 0.75056 0.51274
+0.19644 0.76048 0.53259
+0.1972 0.77042 0.55248
+0.19751 0.78036 0.5724
+0.19739 0.7903 0.59236
+0.19681 0.80022 0.61235
+0.19573 0.81009 0.63237
+0.19423 0.81989 0.65241
+0.1922 0.82959 0.67244
+0.18974 0.83913 0.69245
+0.18683 0.84847 0.71238
+0.1835 0.85752 0.73222
+0.1798 0.86622 0.75189
+0.17577 0.87446 0.77133
+0.17154 0.88215 0.79046
+0.1672 0.88917 0.8092
+0.16285 0.89541 0.82742
+0.15866 0.90075 0.84505
+0.15479 0.90508 0.86196
+0.15145 0.9083 0.87804
+0.1488 0.91033 0.89319
+0.147 0.9111 0.90734
+0.14614 0.91058 0.9204
+0.14627 0.90875 0.93232
+0.1474 0.90562 0.94309
+0.14944 0.90123 0.9527
+0.15222 0.89566 0.96117
+0.15567 0.88898 0.96855
+0.15952 0.8813 0.97492
+0.16369 0.87272 0.98035
+0.16789 0.86336 0.98494
+0.17206 0.85333 0.9888
+0.17603 0.84276 0.99201
+0.17975 0.83174 0.99468
+0.18308 0.82034 0.99691
+0.18603 0.80867 0.99878
+0.18848 0.79679 1
+0.19041 0.78475 1
+0.19184 0.7726 1
+0.19274 0.76037 1
+0.1931 0.74809 1
+0.1929 0.73578 1
+0.19214 0.72346 1
+0.19086 0.71113 1
+0.18909 0.6988 1
+0.18679 0.68652 1
+0.18401 0.67427 1
+0.18079 0.66207 1
+0.17723 0.64994 1
+0.17333 0.63789 1
+0.16932 0.62596 1
+0.16523 0.61417 1
+0.16146 0.60259 1
+0.15814 0.59124 1
+0.1557 0.58022 1
+0.1545 0.56956 1
+0.15501 0.55939 1
+0.15757 0.54976 1
+0.16255 0.54079 1
+0.17005 0.53257 1
+0.18013 0.52519 1
+0.19269 0.51875 1
+0.20747 0.51331 1
+0.22414 0.50895 1
+0.24245 0.50571 1
+0.26202 0.50364 1
+0.28258 0.50272 1
+0.30381 0.50294 1
+0.32553 0.50429 1
+0.34755 0.50666 1
+0.36963 0.51003 1
+0.39169 0.51429 1
+0.41358 0.51935 1
+0.43525 0.52511 1
+0.45659 0.53148 1
+0.4776 0.53838 1
+0.49823 0.5457 1
+0.51845 0.55337 1
+0.53827 0.56134 1
+0.5577 0.56954 1
+0.57675 0.57793 1
+0.59542 0.58647 1
+0.61374 0.59512 1
+0.63175 0.60388 1
+0.64945 0.61271 1
+0.66687 0.6216 1
+0.68404 0.63055 1
+0.70098 0.6395 1
+0.7177 0.64845 1
+0.73421 0.65739 1
+0.75055 0.66627 1
+0.76671 0.67509 1
+0.78273 0.68379 1
+0.7986 0.69233 1
+0.81433 0.70062 1
+0.8299 0.70861 1
+0.8453 0.7162 1
+0.86052 0.72328 1
+0.8755 0.72977 1
+0.89021 0.73553 0.99966
+0.90458 0.74046 0.99387
+0.91855 0.74442 0.987
+0.93205 0.74732 0.97894
+0.94498 0.74904 0.96964
+0.95728 0.74952 0.95905
+0.96886 0.74869 0.94717
+0.97965 0.74653 0.93399
+0.9896 0.74302 0.91958
+0.99865 0.73818 0.90399
+1 0.73207 0.88731
+1 0.72474 0.86966
+1 0.7163 0.85114
+1 0.70684 0.83189
+1 0.69646 0.81201
+1 0.68529 0.79164
+1 0.67343 0.77088
+1 0.66099 0.74982
+1 0.64806 0.72855
+1 0.63473 0.70715
+1 0.62107 0.68567
+1 0.60713 0.66415
+1 0.59297 0.64264
+1 0.5786 0.62116
+1 0.56409 0.59973
+1 0.54941 0.57836
+1 0.53459 0.55708
+1 0.51964 0.53586
+1 0.50455 0.51475
+1 0.48929 0.49372
+1 0.47391 0.4728
+1 0.45838 0.452
+1 0.4427 0.4313
+1 0.42686 0.41072
+1 0.41086 0.39028
+1 0.39472 0.37
+1 0.37845 0.34992
+1 0.36209 0.33004
+1 0.34568 0.31042
+1 0.32933 0.29109
+0.99872 0.31308 0.2721
+0.99487 0.29714 0.25356
+0.99105 0.28163 0.23549
+0.98733 0.26683 0.21793
+0.98375 0.25301 0.20097
+0.98037 0.24049 0.18472
+0.97725 0.22969 0.16917
+0.97445 0.22104 0.15432
+0.97202 0.21483 0.14028
+0.96999 0.21152 0.127
+0.9684 0.21123 0.11451
+""", sep=" ").reshape(-1, 3)
+_CET_C6_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
+    "CET_C6", _CET_C6_RGB, N=len(_CET_C6_RGB))
 plt.ion()
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+
+def get_colormap(name):
+    if name == _CET_C6_CMAP.name:
+        return _CET_C6_CMAP
+    if cmaps is not None and hasattr(cmaps, name):
+        return getattr(cmaps, name)
+    return matplotlib.colormaps[name]
+
+
+def get_selector_background(selector):
+    """ Return the saved blit background of a matplotlib selector widget, or None.
+
+    Matplotlib >= 3.10 keeps it on the canvas, older versions in the `background` attribute.
+    """
+    if hasattr(selector, '_load_blit_background'):
+        return selector._load_blit_background()
+    return getattr(selector, 'background', None)
+
+
+def set_selector_background(selector, background):
+    """ Replace the saved blit background of a matplotlib selector widget. Returns False if that is not possible. """
+    if hasattr(selector, '_save_blit_background'):
+        selector._save_blit_background(background)
+        return True
+    if hasattr(selector, 'background'):
+        selector.background = background
+        return True
+    return False
+
+
+def get_phase_colormap():
+    return get_colormap('hsv')
+
+
+@functools.lru_cache(maxsize=None)
+def get_colormap_names():
+    names = set(matplotlib.colormaps)
+    if cmaps is not None:
+        if isinstance(cmaps, types.ModuleType):
+            names.update(
+                name for name in dir(cmaps)
+                if not name.startswith('_')
+                and isinstance(getattr(cmaps, name), matplotlib.colors.Colormap))
+        else:
+            # dir() lists the colormap names without loading them. Loading and registering all of
+            # them (getattr) takes many seconds. The class attributes are methods, not colormaps.
+            names.update(
+                name for name in dir(cmaps)
+                if not name.startswith('_') and not hasattr(type(cmaps), name))
+    names.add(_CET_C6_CMAP.name)
+    return tuple(sorted(names, key=lambda name: (name.casefold(), name)))
+
 
 class PoldifMode(Enum):
     PARALLEL = 1
@@ -98,8 +441,9 @@ def load_axes(vals, st, axis_type, antenna, refantenna, timeslot=0, freqslot=0, 
                 if wrapphase:
                     y_axis = wrap_phase(y_axis)
             elif (st_type == 'clock') or (st_type == 'rotationmeasure') or ((st_type == 'tec' or st_type == 'phase') and 'freq' not in axes):
-                y_axis = values[:, antenna, direction] - values[:, refantenna, direction]
-                y_axis_weight = weights[:, antenna, direction]
+                # No frequency axis: values have shape (time, ant, pol, dir).
+                y_axis = values[:, antenna, :, direction] - values[:, refantenna, :, direction]
+                y_axis_weight = weights[:, antenna, :, direction]
             else:
                 y_axis = values[:, freqslot, antenna, :, direction]
                 y_axis_weight = weights[:, freqslot, antenna, :, direction]
@@ -251,12 +595,7 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
     x_axis = vals[1]['time']
     y_axis = vals[1]['freq']
     values = np.asarray(vals[0])
-    plabels = []
-
-    try:
-        pols = list(vals[1]['pol'])
-    except:
-        logging.debug('No polarization axis present.')
+    pols = list(vals[1]['pol']) if 'pol' in vals[1] else None
     if (st_type == 'phase') or (st_type == 'rotation'):
         isphase = True
     else:
@@ -300,12 +639,78 @@ def load_axes_2d(vals, weights, st, antenna, refantenna, pol=0, direction=0):
             plotvals = values[:, :, antenna, direction]
             plotvals_weight = weights[:, :, antenna, direction]
         else:
-            plotvals = values[:, :, antenna] - values[:, :, refantenna]
+            plotvals = values[:, :, antenna]
             plotvals_weight = weights[:, :, antenna]
     return x_axis, y_axis, plotvals, plotvals_weight, isphase
 
 
-class GraphWindow(QDialog):
+class PlotWindowBase(QDialog):
+    """ Functionality shared by the 1D and 2D plot windows. """
+    def set_plot_window_title(self, plot_title):
+        """Set the window title with the station and source HDF filename."""
+        if self.h5filename:
+            self.setWindowTitle('{} - {}'.format(plot_title, self.h5filename))
+        else:
+            self.setWindowTitle(plot_title)
+
+    def format_time(self, seconds):
+        """ Formats the time to be displayed in the plotting windows.
+
+        A string is formatted, displaying the time in seconds or (fractional) minutes or hours.
+
+        Args:
+            seconds (int): the time in seconds.
+        Returns:
+            formatted time (str): formatted time string.
+        """
+        if seconds < 60:
+            return '{:.3f} sec'.format(seconds)
+        elif seconds < 3600:
+            return '{:.3f} min'.format(seconds / 60)
+        return '{:.3f} hr'.format(seconds / 3600)
+
+    def _clear_selection(self):
+        """ Forget all marked regions and remove their outlines from the plot. """
+        self.selected_region = None
+        self.selected_regions = []
+        self.grid_pending_regions = {}
+        for patch in self.selection_patches:
+            patch.remove()
+        self.selection_patches = []
+        self.flag_button.setEnabled(False)
+
+
+    @staticmethod
+    def _press_is_inside(selector, event):
+        """ Whether a mouse press falls inside the rectangle of a selector, i.e. adjusts it rather than starting a new one. """
+        x_start, x_end, y_start, y_end = selector.extents
+        return min(x_start, x_end) <= event.xdata <= max(x_start, x_end) and min(y_start, y_end) <= event.ydata <= max(y_start, y_end)
+
+    def _keep_marked_region(self, selector):
+        """ Outline the region of a selector in red and get the selector ready for the next region.
+
+        Only the axes of the selector is redrawn, using blitting: a full redraw of large waterfalls takes long.
+        """
+        ax = selector.ax
+        x_start, x_end, y_start, y_end = selector.extents
+        patch = ax.add_patch(Rectangle((min(x_start, x_end), min(y_start, y_end)), abs(x_end - x_start), abs(y_end - y_start), fill=False, edgecolor='red'))
+        self.selection_patches.append(patch)
+        if hasattr(selector, 'clear'):
+            selector.clear()
+        else:
+            selector.set_visible(False)
+        background = get_selector_background(selector) if selector.useblit else None
+        if background is None:
+            self.canvas.draw_idle()
+            return
+        self.canvas.restore_region(background)
+        ax.draw_artist(patch)
+        self.canvas.blit(ax.bbox)
+        # Store the outline in the background, so it stays visible while the next region is dragged.
+        if not set_selector_background(selector, self.canvas.copy_from_bbox(ax.bbox)):
+            self.canvas.draw_idle()
+
+class GraphWindow(PlotWindowBase):
     """ A window displaying the plotted quantity. Allows the user to cycle through time or frequency.
     """
     def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, timeslot=0, freqslot=0, direction=0, times=None, freqs=None, parent=None, mode='values', do_timediff=False, do_freqdiff=False, do_poldiff=False, poldifmode=PoldifMode.NONE):
@@ -342,6 +747,10 @@ class GraphWindow(QDialog):
         self.st_name = getattr(st, 'name', None)
         self.solset_name = parent.solset.name if parent is not None and hasattr(parent, 'solset') else None
         self.parent = parent
+        # Keep the soltab context this window was opened with, so switching soltab in the main window does not affect it.
+        self.stations = parent.stations if parent is not None else None
+        self.directions = list(parent.directions) if parent is not None else None
+        self.cache_axes = list(parent.stcache.axes) if parent is not None else None
         self.h5filename = getattr(parent, 'h5filename', '')
         self.ax = None
         self.rectangle_selector = None
@@ -353,24 +762,11 @@ class GraphWindow(QDialog):
         self.do_freqdiff = do_freqdiff
         self.do_poldiff = do_poldiff
         self.poldifmode = poldifmode
-        try:
-            self.frequencies = freqs
-        except AttributeError:
-            # frequencies is None, plotting against time.
-            pass
+        self.frequencies = freqs
+        # Times are shown relative to the first solution.
+        self.times = times - times[0] if times is not None else None
 
-        try:
-            self.times = times
-            self.times -= self.times[0]
-        except AttributeError:
-            # times is None, plotting against time.
-            pass
-
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        self.LOGFILEH = logging.FileHandler('h5plot.log')
-        self.LOGFILEH.setLevel(logging.DEBUG)
-        self.LOGFILEH.setFormatter(formatter)
-        self.LOGGER.addHandler(LOGFILEH)
+        add_log_file_handler(self.LOGGER)
 
         self.set_plot_window_title(frametitle)
 
@@ -381,8 +777,8 @@ class GraphWindow(QDialog):
         self.button_prev.setEnabled(False)
         if 'time' in axis.lower():
             try:
-                self.select_label = QLabel('Freq slot {:.2f} MHz'.format(self.frequencies[freqslot] / 1e6))
-                if len(self.frequencies == 1):
+                self.select_label = QLabel('Frequency: {:.3f} MHz'.format(self.frequencies[freqslot] / 1e6))
+                if len(self.frequencies) == 1:
                     self.button_next.setEnabled(False)
                 else:
                     self.button_next.setEnabled(True)
@@ -393,8 +789,8 @@ class GraphWindow(QDialog):
                 self.button_prev.setEnabled(False)
         elif 'freq' in axis.lower():
             try:
-                self.select_label = QLabel('Time: ' + self.format_time(timeslot))
-                if len(self.times == 1):
+                self.select_label = QLabel('Time: ' + self.format_time(self.times[timeslot]))
+                if len(self.times) == 1:
                     self.button_next.setEnabled(False)
                 else:
                     self.button_next.setEnabled(True)
@@ -417,7 +813,7 @@ class GraphWindow(QDialog):
         has_multiple_directions = (
             self.parent is not None
             and 'dir' in self.st.getAxesNames()
-            and len(self.parent.directions) > 1)
+            and len(self.directions) > 1)
         self.btn_diriter_next.setEnabled(has_multiple_directions)
         self.btn_diriter_prev.setEnabled(has_multiple_directions)
 
@@ -437,17 +833,19 @@ class GraphWindow(QDialog):
         self.flag_button.setEnabled(False)
         self.flag_all_button = QPushButton('Flag all points')
         self.flag_all_button.clicked.connect(self._flag_all_points)
-        self.propagate_polarizations = QCheckBox('Expand flags: polarizations')
+        self.propagate_flags_label = QLabel('Expand flags:')
+        self.propagate_polarizations = QCheckBox('polarizations')
         self.propagate_polarizations.setChecked(True)
         self.propagate_polarizations.setEnabled(not self.do_poldiff)
-        self.propagate_directions = QCheckBox('Expand flags: directions')
+        self.propagate_directions = QCheckBox('directions')
         self.propagate_directions.setChecked(True)
-        self.propagate_antennas = QCheckBox('Expand flags: antennas')
+        self.propagate_antennas = QCheckBox('antennas')
         region_widget = QWidget()
         region_layout = QHBoxLayout(region_widget)
         region_layout.addWidget(self.mark_region_button)
         region_layout.addWidget(self.flag_button)
         region_layout.addWidget(self.flag_all_button)
+        region_layout.addWidget(self.propagate_flags_label)
         region_layout.addWidget(self.propagate_polarizations)
         region_layout.addWidget(self.propagate_directions)
         region_layout.addWidget(self.propagate_antennas)
@@ -481,42 +879,25 @@ class GraphWindow(QDialog):
         self.layout.addItem(self.scrolls)
         self.layout.addWidget(antiter_widget)
         self.layout.addWidget(region_widget)
+        self.status_label = QLabel('')
+        self.layout.addWidget(self.status_label)
         self.setLayout(self.layout)
-
-    def set_plot_window_title(self, plot_title):
-        """Set the window title with the station and source HDF filename."""
-        if self.h5filename:
-            self.setWindowTitle('{} - {}'.format(plot_title, self.h5filename))
-        else:
-            self.setWindowTitle(plot_title)
 
     def _toggle_region_selection(self, enabled):
         if self.rectangle_selector is not None:
             self.rectangle_selector.set_active(enabled)
         if not enabled:
-            self.selected_region = None
-            self.selected_regions = []
-            for patch in self.selection_patches:
-                patch.remove()
-            self.selection_patches = []
-            self.flag_button.setEnabled(False)
+            self._clear_selection()
+            self.canvas.draw_idle()
 
     def _on_region_press(self, event):
         if event.inaxes is not self.ax or self.selected_region is None or self.rectangle_selector is None:
             return
-        if event.xdata is None or event.ydata is None:
-            return
-        x_start, x_end, y_start, y_end = self.rectangle_selector.extents
-        if min(x_start, x_end) <= event.xdata <= max(x_start, x_end) and min(y_start, y_end) <= event.ydata <= max(y_start, y_end):
+        if event.xdata is None or event.ydata is None or self._press_is_inside(self.rectangle_selector, event):
             return
         self.selected_regions.append(self.selected_region)
-        self.selection_patches.append(self.ax.add_patch(Rectangle(
-            (min(x_start, x_end), min(y_start, y_end)),
-            abs(x_end - x_start),
-            abs(y_end - y_start),
-            fill=False,
-            edgecolor='red')))
         self.selected_region = None
+        self._keep_marked_region(self.rectangle_selector)
 
     def _on_region_selected(self, start_event, end_event):
         if start_event.xdata is None or end_event.xdata is None:
@@ -533,45 +914,36 @@ class GraphWindow(QDialog):
             self.selected_region = (self.timeslot, self.timeslot + 1, axis_start, axis_stop)
         self.flag_button.setEnabled(axis_start < axis_stop)
 
-    def _flag_selected_region(self):
-        regions = list(self.selected_regions)
-        if self.selected_region is not None:
-            regions.append(self.selected_region)
+    def _flag_region(self, region):
+        polarization = None if self.propagate_polarizations.isChecked() else 0
+        self.parent.update_waterfall_weights(region, self.antindex, polarization, self.directions.index(self.direction), 0.0, self.propagate_directions.isChecked(), self.propagate_polarizations.isChecked(), self.propagate_antennas.isChecked(), dialog_parent=self)
+
+    def _flag_regions(self, regions):
         if not regions:
             return
         x_limits = self.ax.get_xlim()
         y_limits = self.ax.get_ylim()
-        direction_index = self.parent.directions.index(self.direction)
-        for region in regions:
-            polarization = None if self.propagate_polarizations.isChecked() else 0
-            self.parent.update_waterfall_weights(region, self.antindex, polarization, direction_index, 0.0, self.propagate_directions.isChecked(), self.propagate_polarizations.isChecked(), self.propagate_antennas.isChecked(), dialog_parent=self)
-        self.selected_region = None
-        self.selected_regions = []
-        self.flag_button.setEnabled(False)
-        self._refresh_current_plot(x_limits, y_limits)
+        with busy(self.status_label, 'Flagging, please wait...'):
+            for region in regions:
+                self._flag_region(region)
+            self._clear_selection()
+            self._refresh_current_plot(x_limits, y_limits)
+
+    def _flag_selected_region(self):
+        regions = list(self.selected_regions)
+        if self.selected_region is not None:
+            regions.append(self.selected_region)
+        self._flag_regions(regions)
 
     def _flag_all_points(self):
-        x_limits = self.ax.get_xlim()
-        y_limits = self.ax.get_ylim()
-        direction_index = self.parent.directions.index(self.direction)
         if 'time' in self.axis.lower():
             region = (0, len(self.plot_axis), self.freqslot, self.freqslot + 1)
         else:
             region = (self.timeslot, self.timeslot + 1, 0, len(self.plot_axis))
-        polarization = None if self.propagate_polarizations.isChecked() else 0
-        self.parent.update_waterfall_weights(region, self.antindex, polarization, direction_index, 0.0, self.propagate_directions.isChecked(), self.propagate_polarizations.isChecked(), self.propagate_antennas.isChecked(), dialog_parent=self)
-        self.selected_region = None
-        self.selected_regions = []
-        self.flag_button.setEnabled(False)
-        self._refresh_current_plot(x_limits, y_limits)
+        self._flag_regions([region])
 
     def _refresh_current_plot(self, x_limits=None, y_limits=None):
-        self.weights = self.parent.stcache.weights
-        direction_index = self.parent.directions.index(self.direction)
-        if 'time' in self.axis.lower():
-            x, y, yw, labels, isphase = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=direction_index, weights=self.weights)
-        else:
-            x, y, yw, labels, isphase = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, direction=direction_index, weights=self.weights)
+        x, y, yw, labels, isphase = self._load_current()
         legend = self.ax.get_legend()
         legend_loc = legend._loc if legend is not None else None
         self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=labels, isphase=isphase, legend_loc=legend_loc)
@@ -579,7 +951,7 @@ class GraphWindow(QDialog):
             self.ax.set_xlim(x_limits)
         if y_limits is not None:
             self.ax.set_ylim(y_limits)
-        self.canvas.draw()
+        self.canvas.draw_idle()
 
     def _default_x_limits(self, xaxis):
         xaxis = np.asarray(xaxis)
@@ -591,157 +963,115 @@ class GraphWindow(QDialog):
         x_padding = 0.02 * x_span if x_span else 0.02
         return [x_min - x_padding, x_max + x_padding]
 
-    def format_time(self, seconds):
-        """ Formats the time to be displayed in the plotting windows.
+    def _load_current(self):
+        """ Load the axes for the current antenna, direction and time or frequency slot. """
+        return load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, freqslot=self.freqslot, direction=self.directions.index(self.direction), weights=self.weights)
 
-        A string is formatted, displaying the time in seconds or (fractional) minutes or hours.
+    def _step_antenna(self, step):
+        self.antindex = (self.antindex + step) % len(self.stations)
+        x, y, yw, l, p = self._load_current()
+        self.frametitle = self.stations[self.antindex]
+        self.plot(x, y, yw, self.frametitle, limits=[self._default_x_limits(x), None], ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+        self.set_plot_window_title(self.frametitle)
 
-        Args:
-            seconds (int): the time in seconds.
-        Returns:
-            formatted time (str): formatted time string.
-        """
-        if seconds < 60:
-            return '{:.3f} sec'.format(seconds)
-        elif 60 <= seconds < 3600:
-            return '{:.3f} min'.format(seconds / 60)
-        elif seconds >= 3600:
-            return '{:.3f} hr'.format(seconds / 3600)
-        else:
-            return '{:.3f}'.format(seconds)
+    def _step_direction(self, step):
+        if len(self.directions) <= 1:
+            return
+        diridx = (self.directions.index(self.direction) + step) % len(self.directions)
+        self.direction = self.directions[diridx]
+        x, y, yw, l, p = self._load_current()
+        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+        self.set_plot_window_title(self.frametitle)
 
     def _antiter_next_button_event(self):
-        if (self.antindex + 1) < len(self.parent.stations):
-            self.antindex += 1
-        else:
-            self.antindex = 0
-        diridx = self.parent.directions.index(self.direction)
-        x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
-        self.frametitle = self.parent.stations[self.antindex]
-        self.plot(x, y, yw, self.frametitle, limits=[self._default_x_limits(x), None], ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
-        self.set_plot_window_title(self.frametitle)
+        self._step_antenna(1)
 
     def _antiter_prev_button_event(self):
-        if (self.antindex - 1) >= 0:
-            self.antindex -= 1
-        else:
-            self.antindex = len(self.parent.stations) - 1
-        diridx = self.parent.directions.index(self.direction)
-        x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
-        self.frametitle = self.parent.stations[self.antindex]
-        self.plot(x, y, yw, self.frametitle, limits=[self._default_x_limits(x), None], ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
-        self.set_plot_window_title(self.frametitle)
+        self._step_antenna(-1)
 
     def _diriter_next_button_event(self):
-        if len(self.parent.directions) <= 1:
-            return
-        diridx = self.parent.directions.index(self.direction)
-        if (diridx + 1) < len(self.parent.directions):
-            diridx += 1
-        else:
-            diridx = 0
-        self.direction = self.parent.directions[diridx]
-        x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
-        self.frametitle = self.parent.stations[self.antindex]
-        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
-        self.set_plot_window_title(self.frametitle)
+        self._step_direction(1)
 
     def _diriter_prev_button_event(self):
-        if len(self.parent.directions) <= 1:
+        self._step_direction(-1)
+
+    def _set_slot(self, slot):
+        """ Show the given frequency slot (when plotting against time) or time slot (when plotting against frequency).
+
+        Args:
+            slot (int): index along the frequency or time axis.
+        """
+        plot_vs_time = 'time' in self.xlabel.lower()
+        slot_values = self.frequencies if plot_vs_time else self.times
+        if slot_values is None or len(slot_values) == 0:
             return
-        diridx = self.parent.directions.index(self.direction)
-        if (diridx - 1) >= 0:
-            diridx -= 1
+        slot = max(0, min(slot, len(slot_values) - 1))
+        if plot_vs_time:
+            self.freqslot = slot
+            self.select_label.setText('Frequency: {:.3f} MHz'.format(slot_values[slot] / 1e6))
         else:
-            diridx = -1
-        self.direction = self.parent.directions[diridx]
-        x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
-        self.frametitle = self.parent.stations[self.antindex]
+            self.timeslot = slot
+            self.select_label.setText('Time: ' + self.format_time(slot_values[slot]))
+        self.button_prev.setEnabled(slot > 0)
+        self.button_next.setEnabled(slot < len(slot_values) - 1)
+        # Keep the scrollbar in sync without triggering a second redraw.
+        self.scrollbar.blockSignals(True)
+        self.scrollbar.setValue(slot)
+        self.scrollbar.blockSignals(False)
+        x, y, yw, l, p = self._load_current()
         self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
-        self.set_plot_window_title(self.frametitle)
+
+    def _current_slot(self):
+        return self.freqslot if 'time' in self.xlabel.lower() else self.timeslot
 
     def _forward_button_event(self):
         """ An event triggered by pressing the "Forward" button of a GraphWindow.
 
         When pressed, the abscissa is advanced one position, showing the next time or frequency slot.
         """
-        if 'time' in self.xlabel.lower():
-            self.freqslot += 1
-            self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-            diridx = self.parent.directions.index(self.direction)
-            x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
-            if (self.freqslot > 0) and (not self.button_prev.isEnabled()):
-                self.button_prev.setEnabled(True)
-            if self.freqslot == (len(self.frequencies) - 1):
-                self.button_next.setEnabled(False)
-            self.scrollbar.setValue(self.freqslot)
-                
-        elif 'freq' in self.xlabel.lower():
-            self.timeslot += 1
-            self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
-            diridx = self.parent.directions.index(self.direction)
-            x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, direction=diridx, weights=self.weights)
-            if self.timeslot < (len(self.times) - 1) and (not self.button_prev.isEnabled()):
-                self.button_prev.setEnabled(True)
-            if self.timeslot == (len(self.times) - 1):
-                self.button_next.setEnabled(False)
-            self.scrollbar.setValue(self.timeslot)
-        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+        self._set_slot(self._current_slot() + 1)
 
     def _backward_button_event(self):
         """ An event triggered by pressing the "Back" button of a GraphWindow.
 
         When pressed, the abscissa is set back one position, showing the previous time or frequency slot.
         """
-        if (('time' in self.xlabel.lower()) and self.freqslot == 0) or (('freq' in self.xlabel.lower()) and self.timeslot == 0):
-            return
-        if 'time' in self.xlabel.lower():
-            if self.freqslot > 0:
-                self.freqslot -= 1
-                self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-                diridx = self.parent.directions.index(self.direction)
-                x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
-                if self.freqslot == 0:
-                    self.button_prev.setEnabled(False)
-                if (self.freqslot < (len(self.frequencies) - 1)) and (not self.button_next.isEnabled()):
-                    self.button_next.setEnabled(True)
-                self.scrollbar.setValue(self.freqslot)
-        elif 'freq' in self.xlabel.lower():
-            if self.timeslot > 0:
-                self.timeslot -= 1
-                self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
-                diridx = self.parent.directions.index(self.direction)
-                x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, direction=diridx, weights=self.weights)
-                if self.timeslot == 0:
-                    self.button_prev.setEnabled(False)
-                if (self.timeslot < (len(self.parent.times) - 1)) and (not self.button_next.isEnabled()):
-                    self.button_next.setEnabled(True)
-                self.scrollbar.setValue(self.timeslot)
-        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+        self._set_slot(self._current_slot() - 1)
 
     def _scrollbar_event(self):
-        if 'time' in self.xlabel.lower() and len(self.frequencies) > 1:
-            self.freqslot = self.scrollbar.value()
-            self.select_label.setText('Frequency: {:.3f} MHz'.format(self.frequencies[self.freqslot] / 1e6))
-            diridx = self.parent.directions.index(self.direction)
-            x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, freqslot=self.freqslot, direction=diridx, weights=self.weights)
-            if (self.freqslot > 0) and (not self.button_prev.isEnabled()):
-                self.button_prev.setEnabled(True)
-            if self.freqslot == (len(self.frequencies) - 1):
-                self.button_next.setEnabled(False)
-                
-        elif 'freq' in self.xlabel.lower():
-            self.timeslot = self.scrollbar.value()
-            self.select_label.setText('Time: ' + self.format_time(self.times[self.timeslot]))
-            diridx = self.parent.directions.index(self.direction)
-            x, y, yw, l, p = load_axes(self.values, self.st, self.axis, self.antindex, self.refantindex, timeslot=self.timeslot, direction=diridx, weights=self.weights)
-            if self.timeslot < (len(self.times) - 1) and (not self.button_prev.isEnabled()):
-                self.button_prev.setEnabled(True)
-            if self.timeslot == (len(self.times) - 1):
-                self.button_next.setEnabled(False)
-        self.plot(x, y, yw, self.frametitle, ax_labels=[self.xlabel, self.ylabel], plot_labels=l, isphase=p)
+        self._set_slot(self.scrollbar.value())
 
-    def plot(self, xaxis, yaxis, yaxis_weight, frametitle='', limits=[None, None], ax_labels=['', ''], plot_labels=[], multidim=False, isphase=False, legend_loc=None):
+    def _diff_enabled(self):
+        return ('time' in self.xlabel and self.do_timediff) or ('freq' in self.xlabel and self.do_freqdiff)
+
+    def _plot_trace(self, xaxis, values, weights, color, label=None):
+        """ Plot one trace, marking flagged points in red.
+
+        Time or frequency differences are applied first when enabled.
+
+        Args:
+            xaxis (ndarray): abscissa.
+            values (ndarray): values to plot.
+            weights (ndarray): weights of the values; zero means flagged.
+            color (str): matplotlib color of the trace.
+            label (str or None): legend label of the trace.
+        """
+        v_m = np.ma.masked_where(weights == 0, values)
+        if self._diff_enabled():
+            v_m = np.ma.diff(v_m, axis=0)
+            xaxis = xaxis[:-1]
+            weights = weights[:-1]
+            if self.st.getType() == 'phase':
+                v_m = wrap_phase(v_m)
+        self.ax.plot(xaxis, v_m, '--', alpha=0.25, color=color)
+        self.ax.plot(xaxis, v_m, 'h', label=label, color=color)
+        if np.ma.is_masked(v_m):
+            for x in xaxis[weights == 0]:
+                self.ax.axvline(x, color='r')
+            mask = np.ma.getmaskarray(v_m)
+            self.ax.plot(xaxis[mask], np.ma.getdata(v_m)[mask], 'h', color='r')
+
+    def plot(self, xaxis, yaxis, yaxis_weight, frametitle='', limits=(None, None), ax_labels=('', ''), plot_labels=(), multidim=False, isphase=False, legend_loc=None):
         self.xlabel = ax_labels[0]
         self.ylabel = ax_labels[1]
         self.fig.clf()
@@ -755,7 +1085,7 @@ class GraphWindow(QDialog):
         self.plot_axis = np.asarray(xaxis)
         if self.rectangle_selector is not None:
             self.rectangle_selector.disconnect_events()
-        self.rectangle_selector = RectangleSelector(self.ax, self._on_region_selected, useblit=False, button=[1], spancoords='data', interactive=True)
+        self.rectangle_selector = RectangleSelector(self.ax, self._on_region_selected, useblit=True, button=[1], spancoords='data', interactive=True)
         self.rectangle_selector.set_active(self.mark_region_button.isChecked())
         self.selected_region = None
         self.flag_button.setEnabled(False)
@@ -764,165 +1094,28 @@ class GraphWindow(QDialog):
             self.ax.set_title(frametitle + ' - {:s} time diff'.format(self.direction))
         if 'freq' in ax_labels[0] and self.do_freqdiff:
             self.ax.set_title(frametitle + ' - {:s} frequency diff'.format(self.direction))
-        if self.ax.get_legend_handles_labels()[1]:
-            self.ax.legend()
-        if type(xaxis) is list:
-            xaxis = np.asarray(xaxis)
-        if type(yaxis) is list:
-            yaxis = np.asarray(yaxis)
-        if type(yaxis_weight) is list:
-            yaxis_weight = np.asarray(yaxis_weight)
-            # Set weights to 0 for NaN solutions.
-            yaxis_weight[np.isnan(yaxis)] = 0
-        if len(yaxis.shape) > 1 and len(plot_labels) != 0:
-            if self.do_poldiff:
-                # Need to plot polarisation difference.
-                if self.poldifmode == PoldifMode.PARALLEL:
-                    v = yaxis[0, :] - yaxis[-1, :]
-                elif self.poldifmode == PoldifMode.CROSS:
-                    v = yaxis[1, :] - yaxis[2, :]
-                # Handle flagged data. Weights are polarization independent.
-                vw = yaxis_weight[0, :]
-                v_m = np.ma.masked_where(vw == 0, v)
-                if 'time' in ax_labels[0] and self.do_timediff:
-                    v_m = np.ma.diff(v_m, axis=0)
-                    xaxis = xaxis[:-1]
-                    vw = vw[:-1]
-                    if self.st.getType() == 'phase':
-                        v_m = wrap_phase(v_m)
-                if 'freq' in ax_labels[0] and self.do_freqdiff:
-                    v_m = np.diff(v_m, axis=0)
-                    xaxis = xaxis[:-1]
-                    vw = vw[:-1]
-                    if self.st.getType() == 'phase':
-                        v_m = wrap_phase(v_m)
-                self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
-                if self.poldifmode == PoldifMode.PARALLEL:
-                    self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
-                elif self.poldifmode == PoldifMode.CROSS:
-                    self.ax.plot(xaxis, v_m, 'h', label='XY - YX', color='C0')
-                if np.ma.is_masked(v_m):
-                    for x in xaxis[vw==0]:
-                        self.ax.axvline(x, color='r')
-                    self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
-            else:
-                for i in range(yaxis.shape[0]):
-                    if self.mode == 'values':
-                        v = yaxis[i, :]
-                        # Handle flagged data. Weights are polarization independent.
-                        vw = yaxis_weight[i, :]
-                        v_m = np.ma.masked_where(vw == 0, v)
-                        if 'time' in ax_labels[0] and self.do_timediff:
-                            v_m = np.ma.diff(v_m, axis=0)
-                            if i == 0:
-                                xaxis = xaxis[:-1]
-                            vw = vw[:-1]
-                            if self.st.getType() == 'phase':
-                                v_m = wrap_phase(v_m)
-                        if 'freq' in ax_labels[0] and self.do_freqdiff:
-                            v_m = np.diff(v_m, axis=0)
-                            if i == 0:
-                                xaxis = xaxis[:-1]
-                            vw = vw[:-1]
-                            if self.st.getType() == 'phase':
-                                v_m = wrap_phase(v_m)
-                        self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
-                        self.ax.plot(xaxis, v_m, 'h', label=plot_labels[i], color='C' + str(i))
-                        if np.ma.is_masked(v_m):
-                            for x in xaxis[vw==0]:
-                                self.ax.axvline(x, color='r')
-                            self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
-                    elif self.mode == 'weights':
-                        vw = yaxis_weight[i, :]
-                        self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C' + str(i))
-                        self.ax.plot(xaxis, vw, 'h', label=plot_labels[i], color='C' + str(i))
-            self.ax.legend()
-        elif len(yaxis.shape) > 1 and len(plot_labels) == 0:
-            if self.do_poldiff:
-                # Need to plot polarisation difference.
-                if self.poldifmode == PoldifMode.PARALLEL:
-                    v = yaxis[0, :] - yaxis[-1, :]
-                elif self.poldifmode == PoldifMode.CROSS:
-                    v = yaxis[0, :] - yaxis[-1, :]
-                # Handle flagged data. Weights are polarization independent.
-                vw = yaxis_weight[0, :]
-                v_m = np.ma.masked_where(vw == 0, v)
-                if 'time' in ax_labels[0] and self.do_timediff:
-                    v_m = np.ma.diff(v_m, axis=0)
-                    if i == 0:
-                        xaxis = xaxis[:-1]
-                    vw = vw[:-1]
-                    if self.st.getType() == 'phase':
-                        v_m = wrap_phase(v_m)
-                if 'freq' in ax_labels[0] and self.do_freqdiff:
-                    v_m = np.diff(v_m, axis=0)
-                    if i == 0:
-                        xaxis = xaxis[:-1]
-                    vw = vw[:-1]
-                    if self.st.getType() == 'phase':
-                        v_m = wrap_phase(v_m)
-                self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
-                if self.poldifmode == PoldifMode.PARALLEL:
-                    self.ax.plot(xaxis, v_m, 'h', label='XX - YY', color='C0')
-                elif self.poldifmode == PoldifMode.CROSS:
-                    self.ax.plot(xaxis, v_m, 'h', label='XY - YX', color='C0')
-                if np.ma.is_masked(v_m):
-                    for x in xaxis[vw==0]:
-                        self.ax.axvline(x, color='r')
-                    self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
-            else:
-                for i in range(yaxis.shape[0]):
-                    if self.mode == 'values':
-                        v = yaxis[i, :]
-                        vw = yaxis_weight[i, :]
-                        v_m = np.ma.masked_where(yaxis_weight == 0, v)
-                        if 'time' in ax_labels[0] and self.do_timediff:
-                            v_m = np.diff(v_m, axis=0)
-                            if i == 0:
-                                xaxis = xaxis[:-1]
-                            vw = vw[:-1]
-                            if self.st.getType() == 'phase':
-                                v_m = wrap_phase(v_m)
-                        if 'freq' in ax_labels[0] and self.do_freqdiff:
-                            v_m = np.diff(v_m, axis=0)
-                            if i == 0:
-                                xaxis = xaxis[:-1]
-                            vw = vw[:-1]
-                            if self.st.getType() == 'phase':
-                                v_m = wrap_phase(v_m)
-                        self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C' + str(i))
-                        self.ax.plot(xaxis, v_m, 'h', color='C' + str(i))
-                    elif self.mode == 'weights':
-                        vw = yaxis_weight[i, :]
-                        self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C' + str(i))
-                        self.ax.plot(xaxis, vw, 'h', label=plot_labels[i], color='C' + str(i))
+        xaxis = np.asarray(xaxis)
+        yaxis = np.asarray(yaxis)
+        # Set weights to 0 for NaN solutions.
+        yaxis_weight = np.where(np.isnan(yaxis), 0, np.asarray(yaxis_weight))
+        if self.mode == 'weights':
+            traces = yaxis_weight if yaxis.ndim > 1 else [yaxis_weight]
+            for i, vw in enumerate(traces):
+                label = plot_labels[i] if yaxis.ndim > 1 else None
+                self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C' + str(i))
+                self.ax.plot(xaxis, vw, 'h', label=label, color='C' + str(i))
+        elif yaxis.ndim > 1 and self.do_poldiff:
+            pol_a, pol_b = (0, -1) if self.poldifmode == PoldifMode.PARALLEL else (1, 2)
+            # A difference is only valid where both polarisations are unflagged.
+            self._plot_trace(xaxis, yaxis[pol_a] - yaxis[pol_b], yaxis_weight[pol_a] * yaxis_weight[pol_b], 'C0',
+                             label='{} - {}'.format(plot_labels[pol_a], plot_labels[pol_b]))
+        elif yaxis.ndim > 1:
+            for i in range(yaxis.shape[0]):
+                self._plot_trace(xaxis, yaxis[i], yaxis_weight[i], 'C' + str(i), label=plot_labels[i])
         else:
-            if self.mode == 'values':
-                v = yaxis
-                vw = yaxis_weight
-                v_m = np.ma.masked_where(yaxis_weight == 0, v)
-                if 'time' in ax_labels[0] and self.do_timediff:
-                    v_m = np.diff(v_m, axis=0)
-                    xaxis = xaxis[:-1]
-                    vw = vw[:-1]
-                    if self.st.getType() == 'phase':
-                        v_m = wrap_phase(v_m)
-                if 'freq' in ax_labels[0] and self.do_freqdiff:
-                    v_m = np.diff(v_m, axis=0)
-                    xaxis = xaxis[:-1]
-                    vw = vw[:-1]
-                    if self.st.getType() == 'phase':
-                        v_m = wrap_phase(v_m)
-                self.ax.plot(xaxis, v_m, '--', alpha=0.25, color='C0')
-                self.ax.plot(xaxis, v_m, 'h', color='C0')
-                if np.ma.is_masked(v_m):
-                    for x in xaxis[vw==0]:
-                        self.ax.axvline(x, color='r')
-                    self.ax.plot(xaxis[np.ma.getmaskarray(v_m)], np.ma.getdata(v_m)[np.ma.getmaskarray(v_m)], 'h', color='r')
-            elif self.mode == 'weights':
-                    vw = yaxis_weight
-                    self.ax.plot(xaxis, vw, '--', alpha=0.25, color='C0')
-                    self.ax.plot(xaxis, vw, 'h', label=plot_labels, color='C0')
+            self._plot_trace(xaxis, yaxis, yaxis_weight, 'C0')
+        if yaxis.ndim > 1:
+            self.ax.legend()
         x_limits = limits[0]
         y_limits = limits[1]
         if self.mode == 'values' and self.parent is not None:
@@ -952,10 +1145,27 @@ class GraphWindow(QDialog):
             if legend is not None:
                 legend._loc = legend_loc
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=x_limits, ylim=y_limits)
-        self.canvas.draw()
+        self.canvas.draw_idle()
 
 
-class GraphWindow2D(QDialog):
+class ColormapComboBox(QComboBox):
+    """Combo box that shows unprefixed names only while its popup is open."""
+    def set_prefixed_labels(self, prefixed):
+        for index in range(self.count()):
+            colormap_name = self.itemData(index)
+            label = colormap_name or 'Default'
+            self.setItemText(index, 'Cmap: ' + label if prefixed else label)
+
+    def showPopup(self):
+        self.set_prefixed_labels(False)
+        super().showPopup()
+
+    def hidePopup(self):
+        super().hidePopup()
+        self.set_prefixed_labels(True)
+
+
+class GraphWindow2D(PlotWindowBase):
     """ A window displaying the plotted 2D quantity. Allows the user to cycle through antenna.
     """
     def __init__(self, values, weights, frametitle, antindex, refantindex, axis, st, polslot=0, direction=0, times=None, freqs=None, pols=None, parent=None, mode='values', do_timediff=False, do_freqdiff=False, do_poldiff=False, poldifmode=PoldifMode.NONE):
@@ -991,6 +1201,10 @@ class GraphWindow2D(QDialog):
         self.st_name = getattr(st, 'name', None)
         self.solset_name = parent.solset.name if parent is not None and hasattr(parent, 'solset') else None
         self.parent = parent
+        # Keep the soltab context this window was opened with, so switching soltab in the main window does not affect it.
+        self.stations = parent.stations if parent is not None else None
+        self.directions = list(parent.directions) if parent is not None else None
+        self.cache_axes = list(parent.stcache.axes) if parent is not None else None
         self.h5filename = getattr(parent, 'h5filename', '')
         self.ax = None
         self.rectangle_selector = None
@@ -999,6 +1213,7 @@ class GraphWindow2D(QDialog):
         self.selection_patches = []
         self.grid_pending_regions = {}
         self.mode = mode
+        self.colormap_name = None
         self.do_timediff = do_timediff
         self.do_freqdiff = do_freqdiff
         self.do_poldiff = do_poldiff
@@ -1006,29 +1221,12 @@ class GraphWindow2D(QDialog):
         self.nxm_dimensions = None
         self.grid_rectangle_selectors = {}
         self.selected_station_index = antindex
-        try:
-            self.polarizations = pols
-        except AttributeError:
-            pass
+        self.polarizations = pols
+        self.frequencies = freqs
+        # Times are shown relative to the first solution.
+        self.times = times - times[0] if times is not None else None
 
-        try:
-            self.frequencies = freqs
-        except AttributeError:
-            # frequencies is None, plotting against time.
-            pass
-
-        try:
-            self.times = times
-            self.times -= self.times[0]
-        except AttributeError:
-            # times is None, plotting against time.
-            pass
-
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        self.LOGFILEH = logging.FileHandler('h5plot.log')
-        self.LOGFILEH.setLevel(logging.DEBUG)
-        self.LOGFILEH.setFormatter(formatter)
-        self.LOGGER.addHandler(LOGFILEH)
+        add_log_file_handler(self.LOGGER)
 
         self.set_plot_window_title(frametitle)
 
@@ -1065,7 +1263,7 @@ class GraphWindow2D(QDialog):
         has_multiple_directions = (
             self.parent is not None
             and 'dir' in self.st.getAxesNames()
-            and len(self.parent.directions) > 1)
+            and len(self.directions) > 1)
         self.btn_diriter_next.setEnabled(has_multiple_directions)
         self.btn_diriter_prev.setEnabled(has_multiple_directions)
 
@@ -1085,17 +1283,41 @@ class GraphWindow2D(QDialog):
         self.flag_button.setEnabled(False)
         self.flag_all_button = QPushButton('Flag all points')
         self.flag_all_button.clicked.connect(self._flag_all_points)
-        self.propagate_polarizations = QCheckBox('Expand flags: polarizations')
+        self.propagate_flags_label = QLabel('Expand flags:')
+        self.propagate_polarizations = QCheckBox('polarizations')
         self.propagate_polarizations.setChecked(True)
         self.propagate_polarizations.setEnabled(not self.do_poldiff)
-        self.propagate_directions = QCheckBox('Expand flags: directions')
+        self.propagate_directions = QCheckBox('directions')
         self.propagate_directions.setChecked(True)
-        self.propagate_antennas = QCheckBox('Expand flags: antennas')
+        self.propagate_antennas = QCheckBox('antennas')
         region_widget = QWidget()
         region_layout = QHBoxLayout(region_widget)
-        region_layout.addWidget(self.mark_region_button)
-        region_layout.addWidget(self.flag_button)
-        region_layout.addWidget(self.flag_all_button)
+        self.colormap_picker = ColormapComboBox()
+        self.colormap_picker.addItem('Default', None)
+        for colormap_name in get_colormap_names():
+            self.colormap_picker.addItem(colormap_name, colormap_name)
+        self.colormap_picker.set_prefixed_labels(True)
+        self.colormap_picker.setMaxVisibleItems(10)
+        self.colormap_picker.setMinimumWidth(95)
+        self.colormap_picker.setToolTip('Cmap: Default')
+        self.colormap_picker.currentIndexChanged.connect(self._colormap_picker_event)
+        self.colormap_picker.setVisible(
+            self.mode == 'values' and self.st.getType() in ('phase', 'amplitude'))
+        for control in (self.propagate_flags_label, self.propagate_polarizations,
+                        self.propagate_directions, self.propagate_antennas):
+            font = control.font()
+            font.setPointSizeF(font.pointSizeF() * 0.8)
+            control.setFont(font)
+        for control in (self.colormap_picker, self.mark_region_button,
+                        self.flag_button, self.flag_all_button):
+            control.setSizePolicy(
+                QtWidgets.QSizePolicy.Ignored,
+                QtWidgets.QSizePolicy.Preferred)
+        region_layout.addWidget(self.colormap_picker, 1)
+        region_layout.addWidget(self.mark_region_button, 1)
+        region_layout.addWidget(self.flag_button, 1)
+        region_layout.addWidget(self.flag_all_button, 1)
+        region_layout.addWidget(self.propagate_flags_label)
         region_layout.addWidget(self.propagate_polarizations)
         region_layout.addWidget(self.propagate_directions)
         region_layout.addWidget(self.propagate_antennas)
@@ -1116,6 +1338,8 @@ class GraphWindow2D(QDialog):
         self.layout.addItem(self.buttons)
         self.layout.addWidget(antiter_widget)
         self.layout.addWidget(region_widget)
+        self.status_label = QLabel('')
+        self.layout.addWidget(self.status_label)
         self.setLayout(self.layout)
 
         if self.do_poldiff:
@@ -1127,12 +1351,27 @@ class GraphWindow2D(QDialog):
                 self.select_label.setText('Corr.: {:s} - {:s}'.format(self.polarizations[1], self.polarizations[2]))
             return
 
-    def set_plot_window_title(self, plot_title):
-        """Set the window title with the station and source HDF filename."""
-        if self.h5filename:
-            self.setWindowTitle('{} - {}'.format(plot_title, self.h5filename))
+    def _get_plot_colormap(self, isphase):
+        if self.colormap_name is not None:
+            colormap = get_colormap(self.colormap_name)
+        elif isphase:
+            colormap = get_phase_colormap()
         else:
-            self.setWindowTitle(plot_title)
+            colormap = get_colormap('viridis')
+        return copy.copy(colormap)
+
+    def _colormap_picker_event(self, _index):
+        self.colormap_name = self.colormap_picker.currentData()
+        self.colormap_picker.setToolTip(
+            'Cmap: {}'.format(self.colormap_name or 'Default'))
+        if self.mode != 'values' or self.st.getType() not in ('phase', 'amplitude'):
+            return
+        colormap = self._get_plot_colormap(self.st.getType() == 'phase')
+        colormap.set_bad(color='w')
+        for axes in self.fig.axes:
+            for image in axes.get_images():
+                image.set_cmap(colormap)
+        self.canvas.draw_idle()
 
     def _toggle_region_selection(self, enabled):
         if self.rectangle_selector is not None:
@@ -1140,13 +1379,7 @@ class GraphWindow2D(QDialog):
         for selector in self.grid_rectangle_selectors.values():
             selector.set_active(enabled)
         if not enabled:
-            self.selected_region = None
-            self.selected_regions = []
-            self.grid_pending_regions = {}
-            for patch in self.selection_patches:
-                patch.remove()
-            self.selection_patches = []
-            self.flag_button.setEnabled(False)
+            self._clear_selection()
             self.canvas.draw_idle()
 
     def _on_region_press(self, event):
@@ -1156,57 +1389,30 @@ class GraphWindow2D(QDialog):
             for station_index, selector in self.grid_rectangle_selectors.items():
                 if selector.ax == event.inaxes:
                     pending = self.grid_pending_regions.get(station_index)
-                    if pending is None:
-                        return
-                    x_start, x_end, y_start, y_end = selector.extents
-                    if min(x_start, x_end) <= event.xdata <= max(x_start, x_end) and min(y_start, y_end) <= event.ydata <= max(y_start, y_end):
+                    if pending is None or self._press_is_inside(selector, event):
                         return
                     self.selected_regions.append((station_index, pending))
-                    self.selection_patches.append(selector.ax.add_patch(Rectangle(
-                        (min(x_start, x_end), min(y_start, y_end)),
-                        abs(x_end - x_start),
-                        abs(y_end - y_start),
-                        fill=False,
-                        edgecolor='red')))
                     self.grid_pending_regions[station_index] = None
-                    self.canvas.draw_idle()
+                    self._keep_marked_region(selector)
                     return
         else:
             if event.inaxes is not self.ax or self.selected_region is None or self.rectangle_selector is None:
                 return
-            x_start, x_end, y_start, y_end = self.rectangle_selector.extents
-            if min(x_start, x_end) <= event.xdata <= max(x_start, x_end) and min(y_start, y_end) <= event.ydata <= max(y_start, y_end):
+            if self._press_is_inside(self.rectangle_selector, event):
                 return
             self.selected_regions.append(self.selected_region)
-            self.selection_patches.append(self.ax.add_patch(Rectangle(
-                (min(x_start, x_end), min(y_start, y_end)),
-                abs(x_end - x_start),
-                abs(y_end - y_start),
-                fill=False,
-                edgecolor='red')))
             self.selected_region = None
-            self.canvas.draw_idle()
+            self._keep_marked_region(self.rectangle_selector)
 
     def _on_region_selected(self, start_event, end_event):
         if start_event.xdata is None or start_event.ydata is None or end_event.xdata is None or end_event.ydata is None:
             return
-        time_low = min(start_event.xdata, end_event.xdata)
-        time_high = max(start_event.xdata, end_event.xdata)
-        freq_low = min(start_event.ydata, end_event.ydata)
-        freq_high = max(start_event.ydata, end_event.ydata)
-
-        # imshow spreads the array cells between the first and last extent
-        # values. Search those cell edges rather than the solution centers.
-        time_edges = np.linspace(self.plot_time_axis[0], self.plot_time_axis[-1], len(self.plot_time_axis) + 1)
-        freq_edges = np.linspace(self.plot_freq_axis[0], self.plot_freq_axis[-1], len(self.plot_freq_axis) + 1)
-        time_start = int(np.searchsorted(time_edges, time_low, side='right') - 1)
-        time_stop = int(np.searchsorted(time_edges, time_high, side='left'))
-        freq_start = int(np.searchsorted(freq_edges, freq_low, side='right') - 1)
-        freq_stop = int(np.searchsorted(freq_edges, freq_high, side='left'))
-        time_start = max(0, min(time_start, len(self.plot_time_axis) - 1))
-        time_stop = max(0, min(time_stop, len(self.plot_time_axis)))
-        freq_start = max(0, min(freq_start, len(self.plot_freq_axis) - 1))
-        freq_stop = max(0, min(freq_stop, len(self.plot_freq_axis)))
+        time_start, time_stop = image_cells_to_indices(
+            min(start_event.xdata, end_event.xdata), max(start_event.xdata, end_event.xdata),
+            self.plot_time_display_axis, self.plot_time_positions)
+        freq_start, freq_stop = image_cells_to_indices(
+            min(start_event.ydata, end_event.ydata), max(start_event.ydata, end_event.ydata),
+            self.plot_freq_display_axis, self.plot_freq_positions)
         self.selected_region = (time_start, time_stop, freq_start, freq_stop)
         self.selected_station_index = self.antindex
         self.flag_button.setEnabled(True)
@@ -1233,300 +1439,136 @@ class GraphWindow2D(QDialog):
     def _flag_selected_region(self):
         self._update_selected_region_weights(0.0)
 
+    def _flag_region(self, region, antenna, weight=0.0):
+        self.parent.update_waterfall_weights(region, antenna, self.polslot, self.directions.index(self.direction), weight, self.propagate_directions.isChecked(), self.propagate_polarizations.isChecked(), self.propagate_antennas.isChecked(), dialog_parent=self)
+
     def _update_selected_region_weights(self, weight):
-        direction_index = self.parent.directions.index(self.direction)
         if self.gridplot:
             regions = list(self.selected_regions)
-            for station_idx, pending in self.grid_pending_regions.items():
-                if pending is not None:
-                    regions.append((station_idx, pending))
-            if not regions:
-                return
-            for antenna_index, region in regions:
-                self.parent.update_waterfall_weights(region, antenna_index, self.polslot, direction_index, weight, self.propagate_directions.isChecked(), self.propagate_polarizations.isChecked(), self.propagate_antennas.isChecked(), dialog_parent=self)
+            regions += [(station_idx, pending) for station_idx, pending in self.grid_pending_regions.items() if pending is not None]
         else:
-            regions = list(self.selected_regions)
+            regions = [(self.antindex, region) for region in self.selected_regions]
             if self.selected_region is not None:
-                regions.append(self.selected_region)
-            if not regions:
-                return
-            for region in regions:
-                self.parent.update_waterfall_weights(region, self.antindex, self.polslot, direction_index, weight, self.propagate_directions.isChecked(), self.propagate_polarizations.isChecked(), self.propagate_antennas.isChecked(), dialog_parent=self)
-        self.selected_region = None
-        self.selected_regions = []
-        self.grid_pending_regions = {}
-        for patch in self.selection_patches:
-            patch.remove()
-        self.selection_patches = []
-        self.flag_button.setEnabled(False)
-        if self.gridplot:
-            if self.nxm_dimensions is None:
-                self.plot_all()
-            else:
-                self.plot_nxm(*self.nxm_dimensions)
-        else:
+                regions.append((self.antindex, self.selected_region))
+        if not regions:
+            return
+        with busy(self.status_label, 'Flagging, please wait...'):
+            for antenna_index, region in regions:
+                self._flag_region(region, antenna_index, weight)
+            self._clear_selection()
             self._refresh_current_plot()
 
     def _flag_all_points(self):
-        if self.gridplot:
-            region = (0, len(self.grid_time_axis), 0, len(self.grid_freq_axis))
-            self.parent.update_waterfall_weights(region, self.selected_station_index, self.polslot, self.parent.directions.index(self.direction), 0.0, self.propagate_directions.isChecked(), self.propagate_polarizations.isChecked(), self.propagate_antennas.isChecked(), dialog_parent=self)
-            self.selected_region = None
-            self.selected_regions = []
-            self.grid_pending_regions = {}
-            for patch in self.selection_patches:
-                patch.remove()
-            self.selection_patches = []
-            self.flag_button.setEnabled(False)
-            if self.nxm_dimensions is None:
-                self.plot_all()
+        with busy(self.status_label, 'Flagging, please wait...'):
+            if self.gridplot:
+                region = (0, len(self.grid_time_axis), 0, len(self.grid_freq_axis))
+                self._flag_region(region, self.selected_station_index)
             else:
-                self.plot_nxm(*self.nxm_dimensions)
+                region = (0, len(self.plot_time_axis), 0, len(self.plot_freq_axis))
+                self._flag_region(region, self.antindex)
+            self._clear_selection()
+            self._refresh_current_plot()
+
+    def _load_current(self):
+        """ Load the waterfall of the current antenna and direction, as a polarization difference if enabled. """
+        direction_index = self.directions.index(self.direction)
+
+        def load(pol):
+            return load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, pol, direction=direction_index)
+
+        if len(self.polarizations) > 1 and self.do_poldiff:
+            pol_a, pol_b = (0, -1) if self.poldifmode == PoldifMode.PARALLEL else (1, 2)
+            x, y, z1, zw1, isphase = load(pol_a)
+            z2, zw2 = load(pol_b)[2:4]
+            # Combine flags of both polarisations.
+            return x, y, z1 - z2, zw1 * zw2, isphase
+        return load(self.polslot)
+
+    def _redraw(self):
+        """ Redraw the current grid, or the waterfall of the current antenna. """
+        with busy(self.status_label, 'Drawing, please wait...'):
+            if self.gridplot:
+                if self.nxm_dimensions is None:
+                    self.plot_all()
+                else:
+                    self.plot_nxm(*self.nxm_dimensions)
+                return
+            x, y, z, zw, isphase = self._load_current()
+            if self.mode == 'values':
+                self.plot(x, y, np.where(zw, z, np.nan), self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=isphase)
+            else:
+                self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+
+    def _refresh_current_plot(self):
+        """ Redraw after flagging, keeping the zoom of a single waterfall. """
+        if self.gridplot:
+            self._redraw()
             return
         x_limits = self.ax.get_xlim()
         y_limits = self.ax.get_ylim()
-        direction_index = self.parent.directions.index(self.direction)
-        region = (0, len(self.plot_time_axis), 0, len(self.plot_freq_axis))
-        self.parent.update_waterfall_weights(region, self.antindex, self.polslot, direction_index, 0.0, self.propagate_directions.isChecked(), self.propagate_polarizations.isChecked(), self.propagate_antennas.isChecked(), dialog_parent=self)
-        self.selected_region = None
-        self.selected_regions = []
-        self.grid_pending_regions = {}
-        for patch in self.selection_patches:
-            patch.remove()
-        self.selection_patches = []
-        self.flag_button.setEnabled(False)
-        self._refresh_current_plot()
-
-    def _refresh_current_plot(self):
-        self.weights = self.parent.stcache.weights
-        x_limits = self.ax.get_xlim()
-        y_limits = self.ax.get_ylim()
-        direction_index = self.parent.directions.index(self.direction)
-        x, y, z, zw, isphase = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=direction_index)
-        if self.mode == 'values':
-            self.plot(x, y, np.where(zw, z, np.nan), self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=isphase)
-        else:
-            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        self._redraw()
         self.ax.set_xlim(x_limits)
         self.ax.set_ylim(y_limits)
-        self.canvas.draw()
-
-    def format_time(self, seconds):
-        """ Formats the time to be displayed in the plotting windows.
-
-        A string is formatted, displaying the time in seconds or (fractional) minutes or hours.
-
-        Args:
-            seconds (int): the time in seconds.
-        Returns:
-            formatted time (str): formatted time string.
-        """
-        if seconds < 60:
-            return '{:.3f} sec'.format(seconds)
-        elif 60 <= seconds < 3600:
-            return '{:.3f} min'.format(seconds / 60)
-        elif seconds >= 3600:
-            return '{:.3f} hr'.format(seconds / 3600)
-        else:
-            return '{:.3f}'.format(seconds)
+        self.canvas.draw_idle()
 
     def _navigate_nxm_group(self, step):
         if self.nxm_dimensions is None:
             return False
         ncols, nrows = self.nxm_dimensions
         group_size = ncols * nrows
-        last_station = len(self.parent.stations) - 1
+        last_station = len(self.stations) - 1
         self.antindex = max(0, min(self.antindex + step * group_size, last_station))
-        self.frametitle = self.parent.stations[self.antindex]
+        self.frametitle = self.stations[self.antindex]
         self.plot_nxm(ncols, nrows)
         self.set_plot_window_title(self.frametitle)
         return True
 
-    def _antiter_next_button_event(self):
-        if self._navigate_nxm_group(1):
+    def _step_antenna(self, step):
+        if self._navigate_nxm_group(step):
             return
-        if (self.antindex + 1) < len(self.parent.stations):
-            self.antindex += 1
-        else:
-            self.antindex = 0
-        diridx = self.parent.directions.index(self.direction)
-        if len(self.polarizations) > 1 and self.do_poldiff:
-            if self.poldifmode == PoldifMode.PARALLEL:
-                # Need to plot polarisation difference.
-                x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 0, direction=diridx)
-                x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, -1, direction=diridx)
-            elif self.poldifmode == PoldifMode.CROSS:
-                # Need to plot polarisation difference.
-                x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 1, direction=diridx)
-                x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 2, direction=diridx)
-            z = z1 - z2
-            # Combine flags of both polarisations.
-            zw = zw1 * zw2
-        else:
-            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        self.frametitle = self.parent.stations[self.antindex]
-        if self.mode == 'values':
-            z = np.where(zw, z, np.nan)
-            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-        elif self.mode == 'weights':
-            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        self.antindex = (self.antindex + step) % len(self.stations)
+        self.frametitle = self.stations[self.antindex]
+        self._redraw()
         self.set_plot_window_title(self.frametitle)
+
+    def _step_direction(self, step):
+        if len(self.directions) <= 1:
+            return
+        diridx = (self.directions.index(self.direction) + step) % len(self.directions)
+        self.direction = self.directions[diridx]
+        self._redraw()
+        self.set_plot_window_title(self.frametitle)
+
+    def _set_polslot(self, polslot):
+        self.polslot = max(0, min(polslot, len(self.polarizations) - 1))
+        self.button_prev.setEnabled(self.polslot > 0)
+        self.button_next.setEnabled(self.polslot < len(self.polarizations) - 1)
+        self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
+        self._redraw()
+
+    def _antiter_next_button_event(self):
+        self._step_antenna(1)
 
     def _antiter_prev_button_event(self):
-        if self._navigate_nxm_group(-1):
-            return
-        if (self.antindex - 1) >= 0:
-            self.antindex -= 1
-        else:
-            self.antindex = len(self.parent.stations) - 1
-        diridx = self.parent.directions.index(self.direction)
-        if len(self.polarizations) > 1 and self.do_poldiff:
-            if self.poldifmode == PoldifMode.PARALLEL:
-                # Need to plot polarisation difference.
-                x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 0, direction=diridx)
-                x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, -1, direction=diridx)
-            elif self.poldifmode == PoldifMode.CROSS:
-                # Need to plot polarisation difference.
-                x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 1, direction=diridx)
-                x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 2, direction=diridx)
-            z = z1 - z2
-            # Combine flags of both polarisations.
-            zw = zw1 * zw2
-        else:
-            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        self.frametitle = self.parent.stations[self.antindex]
-        if self.mode == 'values':
-            z = np.where(zw, z, np.nan)
-            self.plot(x, y, z, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-        elif self.mode == 'weights':
-            self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
-        self.set_plot_window_title(self.frametitle)
+        self._step_antenna(-1)
 
     def _diriter_next_button_event(self):
-        if len(self.parent.directions) <= 1:
-            return
-        diridx = self.parent.directions.index(self.direction)
-        if (diridx + 1) < len(self.parent.directions):
-            diridx += 1
-        else:
-            diridx = 0
-        self.direction = self.parent.directions[diridx]
-        if len(self.polarizations) > 1 and self.do_poldiff:
-            if self.poldifmode == PoldifMode.PARALLEL:
-                # Need to plot polarisation difference.
-                x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 0, direction=diridx)
-                x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, -1, direction=diridx)
-            elif self.poldifmode == PoldifMode.CROSS:
-                # Need to plot polarisation difference.
-                x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 1, direction=diridx)
-                x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 2, direction=diridx)
-            z = z1 - z2
-            # Combine flags of both polarisations.
-            zw = zw1 * zw2
-        else:
-            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        self.frametitle = self.parent.stations[self.antindex]
-        if self.gridplot:
-            if self.nxm_dimensions is None:
-                self.plot_all()
-            else:
-                self.plot_nxm(*self.nxm_dimensions)
-        else:
-            if self.mode == 'values':
-                self.plot(x, y, np.where(zw, z, np.nan), self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-            elif self.mode == 'weights':
-                self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
-        self.set_plot_window_title(self.frametitle)
+        self._step_direction(1)
 
     def _diriter_prev_button_event(self):
-        if len(self.parent.directions) <= 1:
-            return
-        diridx = self.parent.directions.index(self.direction)
-        if (diridx - 1) >= 0:
-            diridx -= 1
-        else:
-            diridx = len(self.parent.directions) - 1
-        self.direction = self.parent.directions[diridx]
-        if len(self.polarizations) > 1 and self.do_poldiff:
-            if self.poldifmode == PoldifMode.PARALLEL:
-                # Need to plot polarisation difference.
-                x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 0, direction=diridx)
-                x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, -1, direction=diridx)
-            elif self.poldifmode == PoldifMode.CROSS:
-                # Need to plot polarisation difference.
-                x, y, z1, zw1, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 1, direction=diridx)
-                x2, y2, z2, zw2, p2 = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, 2, direction=diridx)
-            z = z1 - z2
-            # Combine flags of both polarisations.
-            zw = zw1 * zw2
-        else:
-            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-        self.frametitle = self.parent.stations[self.antindex]
-        if self.gridplot:
-            if self.nxm_dimensions is None:
-                self.plot_all()
-            else:
-                self.plot_nxm(*self.nxm_dimensions)
-        else:
-            if self.mode == 'values':
-                self.plot(x, y, np.where(zw, z, np.nan), self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-            elif self.mode == 'weights':
-                self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
-        self.set_plot_window_title(self.frametitle)
+        self._step_direction(-1)
 
     def _forward_button_event(self):
-        """ An event triggered by pressing the "Forward" button of a GraphWindow.
-
-        When pressed, the abscissa is advanced one position, showing the next time or frequency slot.
-        """
-        if (self.polslot < (len(self.polarizations) - 1)):
-            self.polslot += 1
-        if (self.polslot > 0) and (not self.button_prev.isEnabled()):
-            self.button_prev.setEnabled(True)
-        if self.polslot == (len(self.polarizations) - 1):
-            self.button_next.setEnabled(False)
-        self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
-        diridx = self.parent.directions.index(self.direction)
-        if self.gridplot:
-            if self.nxm_dimensions is None:
-                self.plot_all()
-            else:
-                self.plot_nxm(*self.nxm_dimensions)
-        else:
-            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-            if self.mode == 'values':
-                self.plot(x, y, np.where(zw, z, np.nan), self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-            elif self.mode == 'weights':
-                self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        """ An event triggered by pressing the "Next polarization" button. """
+        self._set_polslot(self.polslot + 1)
 
     def _backward_button_event(self):
-        """ An event triggered by pressing the "Back" button of a GraphWindow.
-
-        When pressed, the abscissa is set back one position, showing the previous time or frequency slot.
-        """
-        if (self.polslot > 0):
-            self.polslot -= 1
-        if self.polslot == 0:
-            self.button_prev.setEnabled(False)
-        if (self.polslot < (len(self.polarizations) - 1)) and (not self.button_next.isEnabled()):
-            self.button_next.setEnabled(True)
-        self.select_label.setText('Corr.: {:s}'.format(self.polarizations[self.polslot]))
-        diridx = self.parent.directions.index(self.direction)
-        if self.gridplot:
-            if self.nxm_dimensions is None:
-                self.plot_all()
-            else:
-                self.plot_nxm(*self.nxm_dimensions)
-        else:
-            x, y, z, zw, p = load_axes_2d(self.values, self.weights, self.st, self.antindex, self.refantindex, self.polslot, direction=diridx)
-            if self.mode == 'values':
-                self.plot(x, y, np.where(zw, z, np.nan), self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'), isphase=p)
-            elif self.mode == 'weights':
-                self.plot(x, y, zw, self.frametitle, ax_labels=('Time [s]', 'Freq. [MHz]'))
+        """ An event triggered by pressing the "Previous polarization" button. """
+        self._set_polslot(self.polslot - 1)
 
     def plot_all(self):
         self.nxm_dimensions = None
-        Nplots = len(self.parent.stations)
+        Nplots = len(self.stations)
         Ncols = int(np.ceil(np.sqrt(Nplots)))
         Nrows = int(np.ceil(float(Nplots)/Ncols))
         station_indices = list(range(Nplots))
@@ -1535,26 +1577,40 @@ class GraphWindow2D(QDialog):
     def plot_nxm(self, ncols, nrows):
         """Plot stations starting at the selected station in a fixed grid."""
         self.nxm_dimensions = (ncols, nrows)
-        remaining_stations = len(self.parent.stations) - self.antindex
+        remaining_stations = len(self.stations) - self.antindex
         Nplots = min(remaining_stations, ncols * nrows)
         station_indices = list(range(self.antindex, self.antindex + Nplots))
         self._plot_grid(station_indices, ncols, nrows)
 
+    def _station_slice(self, array, station_index, pol=None):
+        """ Select the (time, freq) plane of a cached array for one station at the current polarization and direction. """
+        index = [slice(None), slice(None), station_index]
+        if 'pol' in self.cache_axes:
+            index.append(self.polslot if pol is None else pol)
+        if 'dir' in self.cache_axes:
+            index.append(self.directions.index(self.direction))
+        return array[tuple(index)]
+
+    def _poldiff_pols(self):
+        return (0, -1) if self.poldifmode == PoldifMode.PARALLEL else (1, 2)
+
     def _grid_weights(self, station_index):
-        axes = self.parent.stcache.axes
-        weights = self.parent.stcache.weights
-        direction_index = self.parent.directions.index(self.direction)
-        if ('pol' in axes) and ('dir' in axes):
-            if self.do_poldiff:
-                if self.poldifmode == PoldifMode.PARALLEL:
-                    return weights[:, :, station_index, 0, direction_index] * weights[:, :, station_index, -1, direction_index]
-                return weights[:, :, station_index, 1, direction_index] * weights[:, :, station_index, 2, direction_index]
-            return weights[:, :, station_index, self.polslot, direction_index]
-        if ('pol' not in axes) and ('dir' in axes):
-            return weights[:, :, station_index, direction_index]
-        if ('pol' in axes) and ('dir' not in axes):
-            return weights[:, :, station_index, self.polslot]
-        return weights[:, :, station_index]
+        if self.do_poldiff and 'pol' in self.cache_axes:
+            # A difference is only valid where both polarisations are unflagged.
+            pol_a, pol_b = self._poldiff_pols()
+            return self._station_slice(self.weights, station_index, pol_a) * self._station_slice(self.weights, station_index, pol_b)
+        return self._station_slice(self.weights, station_index)
+
+    def _grid_values(self, station_index, isphase):
+        values = self.values[0]
+        if self.do_poldiff and 'pol' in self.cache_axes:
+            pol_a, pol_b = self._poldiff_pols()
+            return self._station_slice(values, station_index, pol_a) - self._station_slice(values, station_index, pol_b)
+        station_values = self._station_slice(values, station_index)
+        if isphase:
+            # Plot phase-like quantities w.r.t. the reference antenna.
+            station_values = station_values - self._station_slice(values, self.refantindex)
+        return station_values
 
     def _plot_grid(self, station_indices, Ncols, Nrows):
         if self.rectangle_selector is not None:
@@ -1563,22 +1619,18 @@ class GraphWindow2D(QDialog):
         for selector in self.grid_rectangle_selectors.values():
             selector.disconnect_events()
         self.grid_rectangle_selectors = {}
-        self.selected_regions = []
-        self.selected_region = None
-        self.grid_pending_regions = {}
+        # The figure is cleared below, which also removes the outlines of marked regions.
         self.selection_patches = []
-        flagging_enabled = self.nxm_dimensions is not None
-        self.mark_region_button.setEnabled(flagging_enabled)
+        self._clear_selection()
+        self.mark_region_button.setEnabled(True)
         self.flag_button.setEnabled(False)
         self.flag_all_button.setEnabled(False)
-        self.propagate_polarizations.setEnabled(flagging_enabled and not self.do_poldiff)
-        self.propagate_directions.setEnabled(flagging_enabled)
-        self.propagate_antennas.setEnabled(flagging_enabled)
+        self.propagate_polarizations.setEnabled(not self.do_poldiff)
+        self.propagate_directions.setEnabled(True)
+        self.propagate_antennas.setEnabled(True)
         self.fig.clf()
         self.gridplot = True
-        from matplotlib.gridspec import GridSpec
-        import matplotlib.patheffects as pe
-        # plot_window, axes = plt.subplots(Ncols, Nrows, figsize=(16, 9), constrained_layout=True)
+        isphase = self.st.getType() in ('phase', 'rotation')
         grid_bottom = 0.10
         grid_top = 0.95
         gs = GridSpec(Nrows, Ncols, figure=self.fig, left=0.05, right=0.95, bottom=grid_bottom, top=grid_top, hspace=0.04, wspace=0.025)
@@ -1586,125 +1638,63 @@ class GraphWindow2D(QDialog):
         if self.mode == 'values':
             global_limits = self.parent.get_global_limits()
         Nplots = len(station_indices)
-        Nlim = Nplots
-        self.grid_time_axis = np.asarray(self.parent.stcache.values[1]['time'])
+        self.grid_time_axis = np.asarray(self.values[1]['time'])
         self.grid_time_axis = self.grid_time_axis - self.grid_time_axis[0]
-        self.grid_freq_axis = np.asarray(self.parent.stcache.values[1]['freq']) / 1e6
+        self.grid_freq_axis = np.asarray(self.values[1]['freq']) / 1e6
         self.fig.suptitle(self.st.name + ' - {:s}'.format(self.direction))
-        direction_index = self.parent.directions.index(self.direction)
         Nplotted = 0
         for i in range(Nrows):
             for j in range(Ncols):
-                if Nplotted >= Nlim:
+                if Nplotted >= Nplots:
                     continue
                 station_index = station_indices[Nplotted]
                 ax = self.fig.add_subplot(gs[i, j])
-                ax.set_title(self.parent.stations[station_index], y=1.0, pad=-15, color='white', fontweight='bold', path_effects=[pe.withStroke(linewidth=1, foreground="black")])
-                x = self.parent.stcache.values[1]['time']
-                y = self.parent.stcache.values[1]['freq'] / 1e6
-                grid_weights = self._grid_weights(station_index)
+                ax.set_title(self.stations[station_index], y=1.0, pad=-15, color='white', fontweight='bold', path_effects=[patheffects.withStroke(linewidth=1, foreground="black")])
+                x = self.values[1]['time']
+                y = self.values[1]['freq'] / 1e6
+                grid_weights = self._grid_weights(station_index).T
                 if self.mode == 'values':
-                    if self.st.getType() == 'phase':
-                        current_cmap = matplotlib.colormaps['hsv']
-                        current_cmap.set_bad(color='w')
-                        if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
-                            if self.do_poldiff:
-                                if self.poldifmode == PoldifMode.PARALLEL:
-                                    vals = (self.parent.stcache.values[0][:, :, station_index, 0, direction_index] - self.parent.stcache.values[0][:, :, station_index, -1, direction_index]).T
-                                elif self.poldifmode == PoldifMode.CROSS:
-                                    vals = (self.parent.stcache.values[0][:, :, station_index, 1, direction_index] - self.parent.stcache.values[0][:, :, station_index, 2, direction_index]).T
-                            else:
-                                vals = (self.parent.stcache.values[0][:, :, station_index, self.polslot, direction_index] - self.parent.stcache.values[0][:, :, self.refantindex, self.polslot, direction_index]).T
-                        elif not ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
-                            vals = (self.parent.stcache.values[0][:, :, station_index, direction_index] - self.parent.stcache.values[0][:, :, self.refantindex, direction_index]).T
-                        elif ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
-                            if self.do_poldiff:
-                                if self.poldifmode == PoldifMode.PARALLEL:
-                                    vals = (self.parent.stcache.values[0][:, :, station_index, 0] - self.parent.stcache.values[0][:, :, station_index, -1]).T
-                                elif self.poldifmode == PoldifMode.CROSS:
-                                    vals = (self.parent.stcache.values[0][:, :, station_index, 1] - self.parent.stcache.values[0][:, :, station_index, 2]).T
-                            else:
-                                vals = (self.parent.stcache.values[0][:, :, station_index, self.polslot] - self.parent.stcache.values[0][:, :, self.refantindex, self.polslot]).T
-                        elif not ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
-                            vals = (self.parent.stcache.values[0][:, :, station_index] - self.parent.stcache.values[0][:, :, self.refantindex]).T
-                        if self.do_timediff:
-                            vals = np.diff(vals, axis=1)
-                        if self.do_freqdiff:
-                            vals = np.diff(vals, axis=0)
+                    current_cmap = self._get_plot_colormap(isphase)
+                    current_cmap.set_bad(color='w')
+                    # Mask flagged solutions before differencing so the mask has the same shape as the data.
+                    vals = np.where(grid_weights != 0, self._grid_values(station_index, isphase).T, np.nan)
+                    if self.do_timediff:
+                        vals = np.diff(vals, axis=1)
+                    if self.do_freqdiff:
+                        vals = np.diff(vals, axis=0)
+                    if isphase:
                         vals = wrap_phase(vals)
-                        im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap, origin='lower')
-                        if global_limits is not None:
-                            im.set_clim(global_limits[0], global_limits[1])
-                        else:
-                            im.set_clim(-np.pi, np.pi)
-                    else:
-                        current_cmap = matplotlib.colormaps['viridis']
-                        current_cmap.set_bad(color='w')
-                        if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
-                            if self.do_poldiff:
-                                if self.poldifmode == PoldifMode.PARALLEL:
-                                    vals = (self.parent.stcache.values[0][:, :, station_index, 0, direction_index] - self.parent.stcache.values[0][:, :, station_index, -1, direction_index]).T
-                                elif self.poldifmode == PoldifMode.CROSS:
-                                    vals = (self.parent.stcache.values[0][:, :, station_index, 1, direction_index] - self.parent.stcache.values[0][:, :, station_index, 2, direction_index]).T
-                            else:
-                                vals = self.parent.stcache.values[0][:, :, station_index, self.polslot, direction_index].T
-                        elif not ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
-                            vals = self.parent.stcache.values[0][:, :, station_index, direction_index].T
-                        elif ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
-                            if self.do_poldiff:
-                                if self.poldifmode == PoldifMode.PARALLEL:
-                                    vals = (self.parent.stcache.values[0][:, :, station_index, 0] - self.parent.stcache.values[0][:, :, station_index, -1]).T
-                                elif self.poldifmode == PoldifMode.CROSS:
-                                    vals = (self.parent.stcache.values[0][:, :, station_index, 1] - self.parent.stcache.values[0][:, :, station_index, 2]).T
-                            else:
-                                vals = self.parent.stcache.values[0][:, :, station_index, self.polslot].T
-                        elif not ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
-                            vals = self.parent.stcache.values[0][:, :, station_index].T
-                        if self.do_timediff:
-                            vals = np.diff(vals, axis=1)
-                        if self.do_freqdiff:
-                            vals = np.diff(vals, axis=0)
-                        if global_limits is not None:
-                            im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap, origin='lower', vmin=global_limits[0], vmax=global_limits[1])
-                        else:
-                            im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap, origin='lower', vmin=0.5, vmax=2.0)
-                if self.mode == 'values':
-                    vals = np.where(grid_weights.T != 0, vals, np.nan)
-                    im.set_data(vals)
-                elif self.mode == 'weights':
-                    current_cmap = matplotlib.colormaps['viridis']
-                    if ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
-                        vals = self.parent.stcache.weights[:, :, station_index, self.polslot, direction_index].T
-                    elif not ('pol' in self.parent.stcache.axes) and ('dir' in self.parent.stcache.axes):
-                        vals = self.parent.stcache.weights[:, :, station_index, direction_index].T
-                    elif not ('pol' in self.parent.stcache.axes) and not ('dir' in self.parent.stcache.axes):
-                        vals = self.parent.stcache.weights[:, :, station_index, self.polslot].T
-                    im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap, origin='lower', vmin=0.0, vmax=1.0)
-                if flagging_enabled:
-                    x_span = x[-1] - x[0]
-                    y_span = y[-1] - y[0]
-                    x_padding = 0.02 * x_span if x_span else 0.02
-                    y_padding = 0.0325 * y_span if y_span else 0.0325
-                    ax.set_xlim(-x_padding, x[-1] - x[0] + x_padding)
-                    ax.set_ylim(y[0] - y_padding, y[-1] + y_padding)
+                    vmin, vmax = global_limits if global_limits is not None else ((-np.pi, np.pi) if isphase else (0.5, 2.0))
+                else:
+                    current_cmap = get_colormap('viridis')
+                    vals = grid_weights
+                    vmin, vmax = 0.0, 1.0
+                im = ax.imshow(vals, aspect='auto', extent=[0, x[-1]-x[0], y[0], y[-1]], interpolation='none', cmap=current_cmap, origin='lower', vmin=vmin, vmax=vmax)
+                # Leave a margin, so a marked region can start just outside the first or last solution.
+                x_span = x[-1] - x[0]
+                y_span = y[-1] - y[0]
+                x_padding = 0.02 * x_span if x_span else 0.02
+                y_padding = 0.0325 * y_span if y_span else 0.0325
+                ax.set_xlim(-x_padding, x[-1] - x[0] + x_padding)
+                ax.set_ylim(y[0] - y_padding, y[-1] + y_padding)
                 self.grid_rectangle_selectors[station_index] = RectangleSelector(
                     ax,
                     lambda start_event, end_event, station_index=station_index: self._on_grid_region_selected(start_event, end_event, station_index),
-                    useblit=False,
+                    useblit=True,
                     button=[1],
                     spancoords='data',
                     interactive=True)
-                self.grid_rectangle_selectors[station_index].set_active(flagging_enabled and self.mark_region_button.isChecked())
-                try:
-                    self.fig.supxlabel('Time [s]', y=0.02)
-                    self.fig.supylabel('Frequency [MHz]', x=0.01)
-                except AttributeError:
-                    self.LOGGER.warning('Setting labels with supxlabel/supylabel failed, not plotting axes labels. You may need to updated matplotlib to >3.4.')
+                self.grid_rectangle_selectors[station_index].set_active(self.mark_region_button.isChecked())
                 if (Nplotted % Ncols):
                     ax.yaxis.set_visible(False)
                 if (Nplotted < Nplots - Ncols):
                     ax.xaxis.set_visible(False)
                 Nplotted += 1
+        try:
+            self.fig.supxlabel('Time [s]', y=0.02)
+            self.fig.supylabel('Frequency [MHz]', x=0.01)
+        except AttributeError:
+            self.LOGGER.warning('Setting labels with supxlabel/supylabel failed, not plotting axes labels. You may need to updated matplotlib to >3.4.')
         cbar_ax = self.fig.add_axes([0.955, grid_bottom, 0.015, grid_top - grid_bottom])
         self.fig.colorbar(im, cax=cbar_ax)
         if not self.isVisible():
@@ -1712,11 +1702,11 @@ class GraphWindow2D(QDialog):
         self.btn_antiter_prev.setEnabled(self.nxm_dimensions is not None and self.antindex > 0)
         self.btn_antiter_next.setEnabled(
             self.nxm_dimensions is not None
-            and self.antindex + Ncols * Nrows < len(self.parent.stations))
-        self.canvas.draw()
+            and self.antindex + Ncols * Nrows < len(self.stations))
+        self.canvas.draw_idle()
 
 
-    def plot(self, xaxis, yaxis, zaxis, frametitle='', limits=[None, None], ax_labels=['', ''], multidim=False, isphase=False):
+    def plot(self, xaxis, yaxis, zaxis, frametitle='', limits=(None, None), ax_labels=('', ''), multidim=False, isphase=False):
         for selector in self.grid_rectangle_selectors.values():
             selector.disconnect_events()
         self.grid_rectangle_selectors = {}
@@ -1736,7 +1726,7 @@ class GraphWindow2D(QDialog):
         self.grid_pending_regions = {}
         if self.rectangle_selector is not None:
             self.rectangle_selector.disconnect_events()
-        self.rectangle_selector = RectangleSelector(self.ax, self._on_region_selected, useblit=False, button=[1], spancoords='data', interactive=True)
+        self.rectangle_selector = RectangleSelector(self.ax, self._on_region_selected, useblit=True, button=[1], spancoords='data', interactive=True)
         self.rectangle_selector.set_active(self.mark_region_button.isChecked())
         self.selected_region = None
         self.flag_button.setEnabled(False)
@@ -1762,45 +1752,29 @@ class GraphWindow2D(QDialog):
                 self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s} - {:s} time and frequency diff'.format(pol, self.direction))
         else:
             self.ax.set_title(frametitle + ':' + self.st.name + ' - {:s}'.format(self.direction))
-        tdiff = np.diff(xaxis)
-        fdiff = np.diff(yaxis)
-        solint_time = tdiff[0]
-        solint_freq = fdiff[0]
-        vals = zaxis.copy()
-        plot_x = xaxis.copy()
-        plot_y = yaxis.copy()
-        if not np.allclose(np.diff(yaxis), np.diff(yaxis)[0], rtol=0.01): # if not evenly spaced
-            self.LOGGER.warning('Found irregular frequency axis, padding gaps with NaNs...')
-            gapidx = np.nanargmax(np.abs(np.diff(plot_y)) > 2*solint_freq)  # index BEFORE the gap
-            gapsize = plot_y[gapidx+1] - plot_y[gapidx]
-            y_spacing = solint_freq
-            while (gapsize >= 2*y_spacing) and (len(plot_y) <= yaxis[-1] / solint_freq):
-                vals = np.insert(vals, gapidx + 1, np.nan * np.ones((int(gapsize / y_spacing), vals.shape[0])), axis=1)  # fill gap with NaNs
-                plot_y = np.insert(plot_y, gapidx + 1, np.arange(plot_y[gapidx], plot_y[gapidx + 1], solint_freq))  # fill gap with NaNs
-                gapidx = np.nanargmax(np.abs(np.diff(plot_y)) >= 2*solint_freq)  # index BEFORE the gap
-                gapsize = np.abs(plot_y[gapidx+1] - plot_y[gapidx])
-
-        if not np.allclose(np.diff(xaxis), np.diff(xaxis)[0], rtol=0.01): # if not evenly spaced
-            self.LOGGER.warning('Found irregular time axis, padding gaps with NaNs...')
-            gapidx = np.nanargmax(np.abs(np.diff(plot_x)) > 2*solint_time)  # index BEFORE the gap
-            gapsize = plot_x[gapidx+1] - plot_x[gapidx]
-            x_spacing = solint_time
-            while (gapsize >= 2*x_spacing) and (len(plot_x) <= xaxis[-1] / solint_time): # if gap greater 2 times y-spacing, pad NaNs
-                vals = np.insert(vals, gapidx + 1, np.nan * np.ones((int(gapsize / x_spacing), vals.shape[1])), axis=0)  # fill gap with NaNs
-                plot_x = np.insert(plot_x, gapidx + 1, np.arange(plot_x[gapidx], plot_x[gapidx + 1], solint_time))  # fill gap with NaNs
-                gapidx = np.nanargmax(np.abs(np.diff(plot_x)) >= 2*solint_time)  # index BEFORE the gap
-                gapsize = np.abs(plot_x[gapidx+1] - plot_x[gapidx])
-        if self.parent.check_tdiff.isChecked():
+        vals = np.ma.filled(np.ma.asarray(zaxis, dtype=float), np.nan)
+        # Pad gaps in irregular axes with NaNs. The positions record where each solution ends up in the
+        # displayed image, so selected regions can be mapped back to solution indices.
+        plot_x, self.plot_time_positions = pad_axis_gaps(xaxis)
+        plot_y, self.plot_freq_positions = pad_axis_gaps(yaxis)
+        if len(plot_x) != len(xaxis) or len(plot_y) != len(yaxis):
+            self.LOGGER.warning('Found irregular time or frequency axis, padding gaps with NaNs...')
+            padded_vals = np.full((len(plot_x), len(plot_y)), np.nan)
+            padded_vals[np.ix_(self.plot_time_positions, self.plot_freq_positions)] = vals
+            vals = padded_vals
+        self.plot_time_display_axis = plot_x
+        self.plot_freq_display_axis = plot_y
+        if self.do_timediff:
             vals = np.diff(vals, axis=0)
             if self.st.getType() == 'phase':
                 vals = wrap_phase(vals)
-        if self.parent.check_fdiff.isChecked():
+        if self.do_freqdiff:
             vals = np.diff(vals, axis=1)
             if self.st.getType() == 'phase':
                 vals = wrap_phase(vals)
         if isphase:
             vals = wrap_phase(vals)
-            current_cmap = matplotlib.colormaps['hsv']
+            current_cmap = self._get_plot_colormap(True)
             current_cmap.set_bad(color='w')
             im = self.ax.imshow(vals.T, interpolation='none', extent=[plot_x[0], plot_x[-1], plot_y[0], plot_y[-1]], aspect='auto', cmap=current_cmap, origin='lower')
             global_limits = None
@@ -1811,14 +1785,21 @@ class GraphWindow2D(QDialog):
             else:
                 im.set_clim(-np.pi, np.pi)
         else:
-            current_cmap = matplotlib.colormaps['viridis']
+            current_cmap = self._get_plot_colormap(False)
             current_cmap.set_bad(color='w')
             im = self.ax.imshow(vals.T, interpolation='none', extent=[plot_x[0], plot_x[-1], plot_y[0], plot_y[-1]], aspect='auto', cmap=current_cmap, origin='lower')
             if self.mode == 'values' and self.parent is not None:
                 global_limits = self.parent.get_global_limits()
                 if global_limits is not None:
                     im.set_clim(global_limits[0], global_limits[1])
-        cb = self.fig.colorbar(im)
+        self.fig.subplots_adjust(right=0.89)
+        axes_position = self.ax.get_position()
+        colorbar_ax = self.fig.add_axes([
+            axes_position.x1 + 0.035,
+            axes_position.y0,
+            0.015,
+            axes_position.height])
+        self.fig.colorbar(im, cax=colorbar_ax)
         self.ax.set(xlabel=ax_labels[0], ylabel=ax_labels[1], xlim=limits[0], ylim=limits[1])
         if limits[0] is None:
             x_span = plot_x[-1] - plot_x[0]
@@ -1828,7 +1809,7 @@ class GraphWindow2D(QDialog):
             y_span = plot_y[-1] - plot_y[0]
             y_padding = 0.0325 * y_span if y_span else 0.0325
             self.ax.set_ylim(plot_y[0] - y_padding, plot_y[-1] + y_padding)
-        self.canvas.draw()
+        self.canvas.draw_idle()
 
 
 class ListWidget(QListWidget):
@@ -1877,6 +1858,9 @@ class H5PlotGUI(QWidget):
         self.flagged_h5parm = None
         self.flagged_h5file = None
         self.figures = []
+        # Every flag action, to write a DP3 flagging parset.
+        self.flag_history = []
+        self.status_label = None
 
         self.h5parm = lh5.h5parm(self.source_h5file, readonly=True)
         self.solset_labels = self.h5parm.getSolsetNames()
@@ -1886,37 +1870,11 @@ class H5PlotGUI(QWidget):
         self.soltab = self.solset.getSoltab(self.soltab_labels[0])
         self.soltab_axes = list(self.soltab.getAxesNames())
 
-        for l in self.soltab_labels:
-            try:
-                self.frequencies = self.solset.getSoltab(l).getAxisValues('freq')
-                break
-            except TypeError:
-                pass
-        for l in self.soltab_labels:
-            try:
-                self.times = self.solset.getSoltab(l).getAxisValues('time')
-                break
-            except TypeError:
-                pass
-        for l in self.soltab_labels:
-            try:
-                if 'pol' in self.solset.getSoltab(l).getAxesNames():
-                    self.polarizations = self.solset.getSoltab(l).getAxisValues('pol')
-                break
-            except TypeError:
-                pass
-        self.stations = self.soltab.getValues()[1]['ant']
-        try:
-            self.directions = [s.decode('utf-8') for s in self.solset.getSou().keys()]
-        except AttributeError:
-            # Probably normal string.
-            self.directions = [s for s in self.solset.getSou().keys()]
+        self._load_axis_values()
         self.direction = 0
-        self.wrapphase = True
 
-        self.stcache = SoltabCache(self.soltab.getValues(), self.soltab.getAxesNames(), weights=self.soltab.getValues(weight=True)[0])
-        rvals, rweights, raxes = reorder_soltab(self.soltab)
-        self.stcache.update(rvals, raxes, weights=rweights)
+        self.stcache = None
+        self._load_soltab()
         self.refant = self._first_unflagged_station()
 
         self.move(300, 300)
@@ -1945,10 +1903,6 @@ class H5PlotGUI(QWidget):
         self.refant_picker.activated.connect(self._refant_picker_event)
         self.refant_picker.setCurrentIndex(np.flatnonzero(self.stations == self.refant)[0])
 
-        # self.phasewrap_box = QCheckBox('Wrap Phases')
-        # self.phasewrap_box.setChecked(True)
-        # self.phasewrap_box.setEnabled(False)
-        # self.phasewrap_box.stateChanged.connect(self._phasewrap_event)
         self.dir_label = QLabel('Dir.')
         self.dir_picker = QComboBox()
         self.dir_picker.addItems(self.directions)
@@ -2048,6 +2002,14 @@ class H5PlotGUI(QWidget):
         layout.addRow(nxm_layout)
         layout.addRow(self.plot_all_button)
         layout.addRow(self.station_picker)
+        self.save_parset_button = QPushButton('Save DP3 parset')
+        self.save_parset_button.setToolTip('Write a DP3 parset that applies the flags made so far to a Measurement Set.')
+        self.save_parset_button.clicked.connect(self._save_parset_button_event)
+        self.save_parset_button.setEnabled(False)
+        layout.addRow(self.save_parset_button)
+        self.status_label = QLabel('')
+        self.status_label.setWordWrap(True)
+        layout.addRow(self.status_label)
 
         self._update_global_limit_defaults()
         self._global_limits_toggle_event()
@@ -2094,10 +2056,7 @@ class H5PlotGUI(QWidget):
         return self.stations[0]
 
     def _update_poldiff_controls(self):
-        try:
-            pol_count = len(self.soltab.getAxisValues('pol'))
-        except TypeError:
-            pol_count = 0
+        pol_count = self.soltab.getAxisLen('pol') if 'pol' in self.soltab.getAxesNames() else 0
 
         parallel_enabled = pol_count == 2
         cross_enabled = pol_count == 4
@@ -2137,13 +2096,13 @@ class H5PlotGUI(QWidget):
         plt.close('all')
         for f in self.figures:
             f.close()
-        if self.flagged_h5parm is not None:
-            self.flagged_h5parm.close()
-        elif self.h5parm is not None:
-            try:
-                self.h5parm.close()
-            except Exception:
-                pass
+        # With "Overwrite input" both refer to the same, already closed file.
+        for h5 in (self.flagged_h5parm, self.h5parm):
+            if h5 is not None:
+                try:
+                    h5.close()
+                except Exception:
+                    pass
         event.accept()
 
     def _refant_picker_event(self):
@@ -2176,33 +2135,64 @@ class H5PlotGUI(QWidget):
 
         Sets the `soltab` attribute.
         """
-        soltab_prev = self.soltab.name
         self.soltab = self.solset.getSoltab(self.soltab_picker.currentText())
         self.soltab_axes = list(self.soltab.getAxesNames())
         self._update_poldiff_controls()
-        if self.soltab.name == soltab_prev:
+        # Compare the solset too: soltabs in different solsets often share a name.
+        if (self.solset.name, self.soltab.name) == self.loaded_soltab:
             self.logger.debug("Soltab unchanged, not reordering")
             return
         self.logger.debug('Soltab changed to: ' + self.soltab_picker.currentText())
         stations_old = self.stations
-        self.stations = self.soltab.getValues()[1]['ant']
+        directions_old = self.directions
+        self._load_axis_values()
         if not np.array_equiv(stations_old, self.stations):
             self.logger.debug('Number of stations changed, updating list.')
             # The list of stations has changed, update the list.
             self.station_picker.clear()
             self.station_picker.addItems(self.stations)
+            self.station_picker.setCurrentRow(0)
             self.refant_picker.clear()
             self.refant_picker.addItems(self.stations)
-        try:
-            self.frequencies = self.soltab.getAxisValues('freq')
-        except TypeError:
-            # Soltab probably has no frequency axis.
-            pass
-        rvals, rweights, raxes = reorder_soltab(self.soltab)
-        self.stcache.update(rvals, raxes, weights=rweights)
+        if directions_old != self.directions:
+            self.logger.debug('Directions changed, updating list.')
+            self.dir_picker.clear()
+            self.dir_picker.addItems(self.directions)
+            self.direction = 0
+        self._load_soltab()
         self.refant = self._first_unflagged_station()
         self.refant_picker.setCurrentIndex(np.flatnonzero(self.stations == self.refant)[0])
         self._update_global_limit_defaults()
+
+    def _load_axis_values(self):
+        """Read the station, time, frequency, polarization and direction axes of the current soltab.
+
+        Axes the soltab does not have are set to `None`.
+        """
+        axes = self.soltab.getAxesNames()
+
+        def axis_values(name):
+            return self.soltab.getAxisValues(name) if name in axes else None
+
+        self.stations = axis_values('ant')
+        self.times = axis_values('time')
+        self.frequencies = axis_values('freq')
+        self.polarizations = axis_values('pol')
+        if 'dir' in axes:
+            # Use the soltab's own direction order, as the direction index is applied to its dir axis.
+            self.directions = list(axis_values('dir'))
+        else:
+            self.directions = [self._decode_axis_label(s) for s in self.solset.getSou().keys()]
+
+    def _load_soltab(self):
+        """ Read the values and weights of the current soltab into the cache, in the axis order the plots expect. """
+        with busy(self.status_label, 'Loading {}/{}, please wait...'.format(self.solset.name, self.soltab.name)):
+            rvals, rweights, raxes = reorder_soltab(self.soltab)
+        if self.stcache is None:
+            self.stcache = SoltabCache(rvals, raxes, weights=rweights)
+        else:
+            self.stcache.update(rvals, raxes, weights=rweights)
+        self.loaded_soltab = (self.solset.name, self.soltab.name)
 
     def _dir_picker_event(self):
         """Callback function for when the direction is changed.
@@ -2212,51 +2202,41 @@ class H5PlotGUI(QWidget):
         self.logger.debug('Direction changed to: ' + self.dir_picker.currentText())
         self.direction = self.dir_picker.currentIndex()
 
-    def _phasewrap_event(self):
-        """ An even triggered upon switching phase wrapping on or off. (not yet implemented)
-        """
-        self.logger.debug('Phase wrapping changed to ' + str(self.phasewrap_box.isChecked()))
-        self.wrapphase = self.phasewrap_box.isChecked()
-
     def _plot_button_event(self):
         """Callback function for when the plot button is pressed.
 
         Calls the `plot` function subsecquently.
         """
         self.logger.debug('Plotting button pressed.')
-        if self.axis == 'freq' or self.axis == 'time':
-            self.plot(labels=(self.axis, self.soltab.name), mode=self.plotmode)
-        elif self.axis == 'waterfall':
-            self.plot_waterfall(labels=('time', 'freq'), mode=self.plotmode)
+        with busy(self.status_label, 'Plotting, please wait...'):
+            if self.axis == 'freq' or self.axis == 'time':
+                self.plot(labels=(self.axis, self.soltab.name), mode=self.plotmode)
+            elif self.axis == 'waterfall':
+                self.plot_waterfall(labels=('time', 'freq'), mode=self.plotmode)
 
     def _plot_all_button_event(self):
         """ Callback function for when the plot all stations button is pressed."""
         self.logger.debug('Plotting all stations button pressed.')
-        if self.axis == 'freq' or self.axis == 'time':
-            self.plot(labels=(self.axis, self.soltab.name), mode=self.plotmode, plot_all=True)
-        elif self.axis == 'waterfall':
-            self.plot_waterfall(labels=('time', 'freq'), mode=self.plotmode, plot_all=True)
+        with busy(self.status_label, 'Plotting, please wait...'):
+            if self.axis == 'freq' or self.axis == 'time':
+                self.plot(labels=(self.axis, self.soltab.name), mode=self.plotmode, plot_all=True)
+            elif self.axis == 'waterfall':
+                self.plot_waterfall(labels=('time', 'freq'), mode=self.plotmode, plot_all=True)
 
     def _plot_nxm_button_event(self):
         """Callback function for the waterfall NxM grid button."""
         self.logger.debug('Plotting NxM waterfall grid.')
-        if self.axis == 'waterfall':
-            self.plot_waterfall(labels=('time', 'freq'), mode=self.plotmode,
-                                nxm=(self.columns_spinbox.value(), self.rows_spinbox.value()))
+        with busy(self.status_label, 'Plotting, please wait...'):
+            if self.axis == 'waterfall':
+                self.plot_waterfall(labels=('time', 'freq'), mode=self.plotmode,
+                                    nxm=(self.columns_spinbox.value(), self.rows_spinbox.value()))
 
     def _weight_picker_event(self):
-        if self.check_weights.isChecked():
-            self.plotmode = 'weights'
-            self.check_pdiff.setEnabled(False)
-            self.check_fdiff.setEnabled(False)
-            self.check_tdiff.setEnabled(False)
-            self.check_global_values.setEnabled(False)
-        else:
-            self.plotmode = 'values'
-            self.check_pdiff.setEnabled(True)
-            self.check_fdiff.setEnabled(True)
-            self.check_tdiff.setEnabled(True)
-            self.check_global_values.setEnabled(True)
+        values_mode = not self.check_weights.isChecked()
+        self.plotmode = 'values' if values_mode else 'weights'
+        # Differences and global limits only apply to values.
+        for control in (self.check_pdiff, self.check_pdiffx, self.check_fdiff, self.check_tdiff, self.check_global_values):
+            control.setEnabled(values_mode)
         self._global_limits_toggle_event()
         self.logger.info('Plotting {:s}'.format(self.plotmode))
 
@@ -2387,9 +2367,7 @@ class H5PlotGUI(QWidget):
                 self.logger.info('Opened original HDF5 file for overwriting: %s', self.source_h5file)
             else:
                 output_file = os.path.splitext(self.source_h5file)[0] + '_flagged.h5'
-                if os.path.abspath(output_file) == self.source_h5file:
-                    raise RuntimeError('Flagged output file must differ from the input HDF5 file.')
-                while os.path.exists(output_file):
+                if os.path.exists(output_file):
                     answer = QtWidgets.QMessageBox.question(
                         dialog_parent if dialog_parent is not None else self,
                         'Overwrite flagged file?',
@@ -2398,8 +2376,10 @@ class H5PlotGUI(QWidget):
                         QtWidgets.QMessageBox.No)
                     if answer != QtWidgets.QMessageBox.Yes:
                         return None
-                    break
-                shutil.copy2(self.source_h5file, output_file)
+                self.logger.info('Copying %s to %s for flagging, this can take a while for large files.', self.source_h5file, output_file)
+                status_label = getattr(dialog_parent, 'status_label', None) or self.status_label
+                with busy(status_label, 'Copying the H5parm to {} for flagging, this can take a while for large files...'.format(os.path.basename(output_file))):
+                    shutil.copy2(self.source_h5file, output_file)
                 self.flagged_h5file = output_file
                 self.flagged_h5parm = lh5.h5parm(output_file, readonly=False)
                 self.check_overwrite.setEnabled(False)
@@ -2407,96 +2387,165 @@ class H5PlotGUI(QWidget):
         return self.flagged_h5parm
 
     def update_waterfall_weights(self, region, antenna, polslot, direction, weight, propagate_directions=True, propagate_polarizations=True, propagate_antennas=False, dialog_parent=None):
-        """Update weights in the flagging copy for a selected time-frequency region."""
+        """Update weights in the flagging copy for a selected time-frequency region.
+
+        The soltab, cached weights and polarization difference mode are taken from `dialog_parent` when given,
+        so flags always end up in the soltab of the window they were made in.
+        """
         time_start, time_stop, freq_start, freq_stop = region
         if time_start >= time_stop or freq_start >= freq_stop:
             self.logger.warning('Selected region does not contain any solutions: time %d:%d, frequency %d:%d.', time_start, time_stop, freq_start, freq_stop)
             return
+        if dialog_parent is not None and getattr(dialog_parent, 'st_name', None) is not None:
+            solset_name = dialog_parent.solset_name
+            soltab_name = dialog_parent.st_name
+            cache_weights = dialog_parent.weights
+            cache_axes = dialog_parent.cache_axes
+            do_poldiff = dialog_parent.do_poldiff
+            poldifmode = dialog_parent.poldifmode
+        else:
+            solset_name = self.solset.name
+            soltab_name = self.soltab.name
+            cache_weights = self.stcache.weights
+            cache_axes = list(self.stcache.axes)
+            do_poldiff = self.do_poldiff
+            poldifmode = self.poldifmode
         target_h5parm = self._get_flagged_h5parm(dialog_parent=dialog_parent)
         if target_h5parm is None:
             return
-        target_soltab = target_h5parm.getSolset(self.solset.name).getSoltab(self.soltab.name)
+        target_soltab = target_h5parm.getSolset(solset_name).getSoltab(soltab_name)
+        soltab_axes = list(target_soltab.getAxesNames())
 
-        if propagate_antennas and 'ant' in self.soltab_axes:
-            antenna_indices = list(range(len(target_soltab.getAxisValues('ant'))))
+        if propagate_antennas and 'ant' in soltab_axes:
+            antenna_indices = list(range(target_soltab.getAxisLen('ant')))
         else:
             antenna_indices = [antenna]
 
-        if propagate_polarizations and 'pol' in self.soltab_axes:
-            polarization_indices = list(range(len(target_soltab.getAxisValues('pol'))))
-        elif self.do_poldiff and self.poldifmode == PoldifMode.PARALLEL:
+        if propagate_polarizations and 'pol' in soltab_axes:
+            polarization_indices = list(range(target_soltab.getAxisLen('pol')))
+        elif do_poldiff and poldifmode == PoldifMode.PARALLEL:
             polarization_indices = [0, -1]
-        elif self.do_poldiff and self.poldifmode == PoldifMode.CROSS:
+        elif do_poldiff and poldifmode == PoldifMode.CROSS:
             polarization_indices = [1, 2]
         elif polslot is None:
             polarization_indices = [0]
         else:
             polarization_indices = [polslot]
+        if 'pol' in soltab_axes:
+            polarization_indices = [p % target_soltab.getAxisLen('pol') for p in polarization_indices]
 
-        if propagate_directions and 'dir' in self.soltab_axes:
-            direction_indices = list(range(len(target_soltab.getAxisValues('dir'))))
+        if propagate_directions and 'dir' in soltab_axes:
+            direction_indices = list(range(target_soltab.getAxisLen('dir')))
         else:
             direction_indices = [direction]
 
-        selection = []
-        for axis_name in self.soltab_axes:
-            if axis_name == 'time':
-                selection.append(slice(time_start, time_stop))
-            elif axis_name == 'freq':
-                selection.append(slice(freq_start, freq_stop))
-            elif axis_name == 'ant':
-                selection.append(antenna_indices)
-            elif axis_name == 'pol':
-                selection.append(polarization_indices)
-            elif axis_name == 'dir':
-                selection.append(direction_indices)
-            else:
-                selection.append(slice(None))
-        for polarization_index in polarization_indices:
-            for direction_index in direction_indices:
-                for antenna_index in antenna_indices:
-                    current_selection = list(selection)
-                    if 'ant' in self.soltab_axes:
-                        current_selection[self.soltab_axes.index('ant')] = antenna_index
-                    if 'pol' in self.soltab_axes:
-                        current_selection[self.soltab_axes.index('pol')] = polarization_index
-                    if 'dir' in self.soltab_axes:
-                        current_selection[self.soltab_axes.index('dir')] = direction_index
-                    target_soltab.setValues(weight, selection=current_selection, weight=True)
+        axis_indices = {
+            'time': slice(time_start, time_stop),
+            'freq': slice(freq_start, freq_stop),
+            'ant': indices_to_selection(antenna_indices),
+            'pol': indices_to_selection(polarization_indices),
+            'dir': indices_to_selection(direction_indices),
+        }
+        for selection in iterate_selections(soltab_axes, axis_indices):
+            target_soltab.setValues(weight, selection=selection, weight=True)
+        self._record_flag(target_soltab, solset_name, soltab_name, region, antenna_indices if not (propagate_antennas and 'ant' in soltab_axes) else None, polarization_indices, direction_indices)
 
-        cache_selection = []
-        for axis_name in self.stcache.axes:
-            if axis_name == 'time':
-                cache_selection.append(slice(time_start, time_stop))
-            elif axis_name == 'freq':
-                cache_selection.append(slice(freq_start, freq_stop))
-            elif axis_name == 'ant':
-                cache_selection.append(antenna_indices)
-            elif axis_name == 'pol':
-                cache_selection.append(polarization_indices)
-            elif axis_name == 'dir':
-                cache_selection.append(direction_indices)
-            else:
-                cache_selection.append(slice(None))
-        for polarization_index in polarization_indices:
-            for direction_index in direction_indices:
-                for antenna_index in antenna_indices:
-                    current_selection = list(cache_selection)
-                    if 'ant' in self.stcache.axes:
-                        current_selection[self.stcache.axes.index('ant')] = antenna_index
-                    if 'pol' in self.stcache.axes:
-                        current_selection[self.stcache.axes.index('pol')] = polarization_index
-                    if 'dir' in self.stcache.axes:
-                        current_selection[self.stcache.axes.index('dir')] = direction_index
-                    self.stcache.weights[tuple(current_selection)] = weight
+        # Update every cached copy of this soltab's weights: the window's, the main window's and other open windows'.
+        weight_caches = [(cache_weights, cache_axes)]
+        if (solset_name, soltab_name) == self.loaded_soltab:
+            weight_caches.append((self.stcache.weights, list(self.stcache.axes)))
+        for plot_window in self.figures:
+            if (getattr(plot_window, 'solset_name', None), getattr(plot_window, 'st_name', None)) == (solset_name, soltab_name):
+                weight_caches.append((plot_window.weights, plot_window.cache_axes))
+        updated = set()
+        for weights, axes in weight_caches:
+            if id(weights) in updated:
+                continue
+            updated.add(id(weights))
+            for selection in iterate_selections(axes, axis_indices):
+                weights[tuple(selection)] = weight
+
         for plot_window in self.figures:
             if plot_window is dialog_parent or not isinstance(plot_window, GraphWindow2D) or not plot_window.isVisible() or not plot_window.gridplot:
+                continue
+            if (plot_window.solset_name, plot_window.st_name) != (solset_name, soltab_name):
                 continue
             if plot_window.nxm_dimensions is None:
                 plot_window.plot_all()
             else:
                 plot_window.plot_nxm(*plot_window.nxm_dimensions)
-        self.logger.info('Updated waterfall weights in %s', self.flagged_h5file)
+        self.logger.info('Updated waterfall weights of %s/%s in %s', solset_name, soltab_name, self.flagged_h5file)
+
+    def _record_flag(self, soltab, solset_name, soltab_name, region, antenna_indices, polarization_indices, direction_indices):
+        """ Remember a flag action, to write it to a DP3 parset later.
+
+        Args:
+            soltab (Soltab): the soltab that was flagged.
+            solset_name (str): name of its solset.
+            soltab_name (str): name of the soltab.
+            region (tuple): (time_start, time_stop, freq_start, freq_stop) solution indices.
+            antenna_indices (list or None): flagged antennas, None for all antennas.
+            polarization_indices (list): flagged polarizations.
+            direction_indices (list): flagged directions.
+        """
+        axes = soltab.getAxesNames()
+
+        def axis_names(axis, indices):
+            if axis not in axes:
+                return None
+            values = soltab.getAxisValues(axis)
+            return [str(values[i]) for i in indices]
+
+        time_start, time_stop, freq_start, freq_stop = region
+        self.flag_history.append({
+            'solset': solset_name,
+            'soltab': soltab_name,
+            'region': region,
+            'stations': axis_names('ant', antenna_indices) if antenna_indices is not None else None,
+            'time': solution_range(soltab.getAxisValues('time') if 'time' in axes else None, time_start, time_stop),
+            'freq': solution_range(soltab.getAxisValues('freq') if 'freq' in axes else None, freq_start, freq_stop),
+            'pols': axis_names('pol', polarization_indices),
+            'dirs': axis_names('dir', direction_indices),
+        })
+        self.save_parset_button.setEnabled(True)
+
+    def write_dp3_parset(self, path):
+        """ Write the flags made so far as a DP3 flagging parset. """
+        text = make_dp3_parset(self.flag_history, os.path.basename(path), self.source_h5file, self.flagged_h5file)
+        with open(path, 'w') as parset:
+            parset.write(text)
+        self.logger.info('Wrote DP3 flagging parset %s for %d flag actions.', path, len(self.flag_history))
+
+    def _choose_parset_path(self):
+        """ Return where to save the DP3 parset, asking the user if the default file exists. None if cancelled. """
+        default_path = os.path.join(os.getcwd(), os.path.splitext(self.h5filename)[0] + '_DP3_preflag.parset')
+        if not os.path.exists(default_path):
+            return default_path
+        box = QtWidgets.QMessageBox(self)
+        box.setIcon(QtWidgets.QMessageBox.Question)
+        box.setWindowTitle('DP3 parset exists')
+        box.setText('The DP3 parset already exists:\n{}\n\nOverwrite it, or save under a new file name?'.format(default_path))
+        overwrite_button = box.addButton('Overwrite', QtWidgets.QMessageBox.AcceptRole)
+        save_as_button = box.addButton('Save as...', QtWidgets.QMessageBox.ActionRole)
+        box.addButton(QtWidgets.QMessageBox.Cancel)
+        exec_dialog(box)
+        if box.clickedButton() is overwrite_button:
+            return default_path
+        if box.clickedButton() is save_as_button:
+            path, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Save DP3 parset', default_path, 'Parset files (*.parset);;All files (*)')
+            return path or None
+        return None
+
+    def _save_parset_button_event(self):
+        if not self.flag_history:
+            return
+        path = self._choose_parset_path()
+        if path is None:
+            return
+        self.write_dp3_parset(path)
+        QtWidgets.QMessageBox.information(
+            self, 'DP3 parset saved',
+            'Saved the flags as a DP3 parset:\n{}\n\nApply them to a Measurement Set with:\n    DP3 {} msin=<your.ms>'.format(path, os.path.basename(path)))
 
     def plot_waterfall(self, labels=('x-axis', 'y-axis'), mode='values', plot_all=False, nxm=None):
         """ Show a two-dimensional waterfall plot of time vs. frequency.
@@ -2510,10 +2559,8 @@ class H5PlotGUI(QWidget):
                          ' for ' + self.solset.name)
         antenna = self.station_picker.currentRow()
         # Data loaded here is xaxis, yaxis, zaxis, isphase
-        print('Loading data')
         try:
-            #x, y, z, zw, p = msg
-            if hasattr(self, "polarizations"):
+            if self.polarizations is not None:
                 if len(self.polarizations) > 1 and self.do_poldiff:
                     if self.poldifmode == PoldifMode.PARALLEL:
                         # Need to plot polarisation difference.
@@ -2536,16 +2583,18 @@ class H5PlotGUI(QWidget):
         if (len(x) == 1) or (len(y) == 1):
             self.logger.info('Either time or frequency has only 1 entry, not plotting!')
             return
-        # print('PLOTTING 2D WEIGHTS')
-        tempvals = self.stcache.values[0]
-        tempvals = np.where(self.stcache.weights, tempvals, np.nan)
-        self.stcache.values = (tempvals, self.stcache.values[1])
-        try:
-            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, np.argwhere(self.stations == self.refant).item(), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=self.polarizations, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.do_poldiff, poldifmode=self.poldifmode)
-        except AttributeError:
-            # No polarizations most likely.
-            plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, np.argwhere(self.stations == self.refant).item(), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=['N/A'], parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.do_poldiff, poldifmode=self.poldifmode)
+        # Blank flagged solutions, so they also drop out of differences with the reference antenna.
+        # This is done in place, as the array can be very large.
+        if np.issubdtype(self.stcache.values[0].dtype, np.floating):
+            self.stcache.values[0][self.stcache.weights == 0] = np.nan
+        pols = self.polarizations if self.polarizations is not None else ['N/A']
+        plot_window = GraphWindow2D(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, np.argwhere(self.stations == self.refant).item(), self.axis, self.soltab, times=self.times, freqs=self.frequencies, pols=pols, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.do_poldiff, poldifmode=self.poldifmode)
         self.figures.append(plot_window)
+        if nxm is None and not plot_all:
+            plot_window.fig.set_size_inches(
+                plot_window.fig.get_figwidth() * 0.5,
+                plot_window.fig.get_figheight() * 0.5,
+                forward=True)
         if nxm is not None:
             plot_window.plot_nxm(*nxm)
         elif plot_all:
@@ -2557,6 +2606,12 @@ class H5PlotGUI(QWidget):
             elif mode == 'weights':
                 plot_window.plot(x, y, zw, ax_labels=('Time [s]', 'Freq. [MHz]'), frametitle=self.stations[antenna])
 
+        if nxm is None and not plot_all:
+            plot_window.layout.setSizeConstraint(QtWidgets.QLayout.SetNoConstraint)
+            screen_geometry = QApplication.primaryScreen().availableGeometry()
+            plot_window.resize(
+                int(screen_geometry.width() * 0.565),
+                int(screen_geometry.height() * 0.73))
         plot_window.show()
 
     def plot(self, labels=('x-axis', 'y-axis'), limits=([None, None], [None, None]), mode='values', plot_all=False):
@@ -2579,7 +2634,6 @@ class H5PlotGUI(QWidget):
         else:
             # Probably TEC or another solution type with no frequency axis.
             plot_window = GraphWindow(self.stcache.values, self.stcache.weights, self.stations[antenna], antenna, np.argwhere(self.stations == self.refant).item(), self.axis, self.soltab, times=self.times, parent=self, direction=self.directions[self.direction], mode=mode, do_timediff=self.check_tdiff.isChecked(), do_freqdiff=self.check_fdiff.isChecked(), do_poldiff=self.do_poldiff, poldifmode=self.poldifmode)
-        print("POLDIF MODE IS", self.poldifmode)
         self.figures.append(plot_window)
         plot_window.plot(x_axis, Y_AXIS, Y_AXIS_WEIGHT, self.stations[antenna], limits=[None, None], ax_labels=[self.axis, labels[1]], plot_labels=plabels, isphase=isphase)
         plot_window.show()
@@ -2659,16 +2713,14 @@ def reorder_soltab(st):
     if 'dir' in order_old:
         order_new += ['dir']
     t1 = time.time()
-    reordered = reorderAxes(st.getValues()[0], order_old, order_new)
-    reordered_weights = reorderAxes(st.getValues(weight=True)[0], order_old, order_new)
+    # Read values and weights only once each; they can be very large.
+    values, axis_values = st.getValues()
+    weights = st.getValues(weight=True, retAxesVals=False)
+    reordered = reorderAxes(values, order_old, order_new)
+    reordered_weights = reorderAxes(weights, order_old, order_new)
     t2 = time.time()
-    LOGGER.info('Reordering took {:f} seconds'.format(t2 - t1))
-    reordered2 = {}
-    for k in order_new:
-        reordered2[k] = st.axes[k]
-    st.axes = reordered2
-    st.axesNames = order_new
-    st_new = (reordered, st.getValues()[1])
+    LOGGER.info('Reading and reordering took {:f} seconds'.format(t2 - t1))
+    st_new = (reordered, {axis: axis_values[axis] for axis in order_new})
     return st_new, reordered_weights, order_new
 
 
@@ -2686,6 +2738,251 @@ def wrap_phase(phase):
     return wphase
 
 
+def add_log_file_handler(logger):
+    """ Attach the shared h5plot.log file handler to a logger.
+
+    The handler is created once, so opening plot windows does not open new log files.
+
+    Args:
+        logger (Logger): logger to attach the handler to.
+    Returns:
+        handler (FileHandler): the shared file handler.
+    """
+    global _LOG_FILE_HANDLER
+    if _LOG_FILE_HANDLER is None:
+        _LOG_FILE_HANDLER = logging.FileHandler('h5plot.log')
+        _LOG_FILE_HANDLER.setLevel(logging.DEBUG)
+        _LOG_FILE_HANDLER.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    # addHandler ignores a handler that is already attached.
+    logger.addHandler(_LOG_FILE_HANDLER)
+    return _LOG_FILE_HANDLER
+
+
+def pad_axis_gaps(axis, max_growth=20):
+    """ Fill gaps in an irregular axis with samples at the smallest spacing.
+
+    Args:
+        axis (ndarray): monotonically increasing axis values.
+        max_growth (int): do not pad if the padded axis would be this many times longer.
+    Returns:
+        padded (ndarray): axis with gaps filled.
+        positions (ndarray): index of each original sample in the padded axis.
+    """
+    axis = np.asarray(axis, dtype=float)
+    positions = np.arange(len(axis))
+    if len(axis) < 3:
+        return axis, positions
+    steps = np.diff(axis)
+    if not np.any(steps > 0) or np.allclose(steps, steps[0], rtol=0.01):
+        return axis, positions
+    step = np.min(steps[steps > 0])
+    n_missing = np.maximum(np.rint(steps / step).astype(int) - 1, 0)
+    padded_positions = positions + np.concatenate(([0], np.cumsum(n_missing)))
+    if padded_positions[-1] + 1 > max_growth * len(axis):
+        LOGGER.warning('Not padding axis gaps, the padded axis would be too large.')
+        return axis, positions
+    padded = np.interp(np.arange(padded_positions[-1] + 1), padded_positions, axis)
+    return padded, padded_positions
+
+
+def image_cells_to_indices(low, high, display_axis, positions):
+    """ Convert a coordinate range on an imshow image to a range of solution indices.
+
+    imshow spreads the image cells evenly between the first and last value of the displayed axis,
+    so the cell edges are searched rather than the solution centers.
+
+    Args:
+        low (float): lower coordinate of the selection.
+        high (float): upper coordinate of the selection.
+        display_axis (ndarray): the (possibly padded) axis the image was drawn with.
+        positions (ndarray): index of each solution in the displayed axis.
+    Returns:
+        start (int): first selected solution index.
+        stop (int): one past the last selected solution index; equal to start if nothing was selected.
+    """
+    edges = np.linspace(display_axis[0], display_axis[-1], len(display_axis) + 1)
+    cell_start = int(np.searchsorted(edges, low, side='right') - 1)
+    cell_stop = int(np.searchsorted(edges, high, side='left'))
+    selected = np.flatnonzero((positions >= cell_start) & (positions < cell_stop))
+    if len(selected) == 0:
+        return 0, 0
+    return int(selected[0]), int(selected[-1]) + 1
+
+
+def indices_to_selection(indices):
+    """ Turn a list of indices into a slice if they are contiguous, so they can be written in one go.
+
+    Args:
+        indices (list): indices along an axis.
+    Returns:
+        selection (slice or list): a slice for contiguous indices, otherwise a sorted list.
+    """
+    indices = sorted(set(int(i) for i in indices))
+    if indices == list(range(indices[0], indices[-1] + 1)):
+        return slice(indices[0], indices[-1] + 1)
+    return indices
+
+
+def iterate_selections(axes, axis_indices):
+    """ Yield selections over the given axes.
+
+    PyTables only allows a single index list per selection, so the combinations of all lists are looped over.
+
+    Args:
+        axes (list): axis names in the order of the array to select from.
+        axis_indices (dict): slice or list of indices per axis name. Missing axes are fully selected.
+    Yields:
+        selection (list): one index, slice or int per axis.
+    """
+    selection = [axis_indices.get(axis, slice(None)) for axis in axes]
+    list_positions = [i for i, s in enumerate(selection) if isinstance(s, list)]
+    for combination in itertools.product(*[selection[i] for i in list_positions]):
+        current_selection = list(selection)
+        for i, index in zip(list_positions, combination):
+            current_selection[i] = index
+        yield current_selection
+
+
+@contextlib.contextmanager
+def busy(status_label=None, message=''):
+    """ Show a wait cursor, and optionally a message, while slow work runs, so the GUI does not look frozen.
+
+    Pending redraws are run before the cursor is restored, so the feedback lasts until the plot is updated.
+
+    Args:
+        status_label (QLabel or None): label to show the message in.
+        message (str): message to show while busy.
+    """
+    previous_message = status_label.text() if status_label is not None else ''
+    QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+    if status_label is not None:
+        status_label.setText(message)
+    QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+    try:
+        yield
+        QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+    finally:
+        if status_label is not None:
+            status_label.setText(previous_message)
+        QApplication.restoreOverrideCursor()
+
+
+def exec_dialog(dialog):
+    """ Run a modal Qt dialog; PyQt5 names the method exec_, PySide6 exec. """
+    return dialog.exec() if hasattr(dialog, 'exec') else dialog.exec_()
+
+
+def solution_range(axis_values, start, stop):
+    """ Return the range covered by solutions start up to stop, including half a solution interval on both sides.
+
+    Args:
+        axis_values (ndarray or None): solution times or frequencies (centres of the solution intervals).
+        start (int): first solution index.
+        stop (int): one past the last solution index.
+    Returns:
+        range (tuple or None): (low, high), or None if the axis is missing or has a single solution,
+        in which case the solution interval is unknown.
+    """
+    if axis_values is None or len(axis_values) < 2:
+        return None
+    axis_values = np.asarray(axis_values, dtype=float)
+    steps = np.diff(axis_values)
+    step = np.min(steps[steps > 0])
+    return axis_values[start] - step / 2, axis_values[stop - 1] + step / 2
+
+
+def mjd_seconds_to_mvtime(seconds):
+    """ Format a time in MJD seconds (as used in H5parms and Measurement Sets) as a casacore MVTime string. """
+    moment = datetime.datetime(1858, 11, 17) + datetime.timedelta(seconds=seconds)
+    return moment.strftime('%Y/%m/%d/%H:%M:%S.') + '{:03d}'.format(moment.microsecond // 1000)
+
+
+def _dp3_time_range(time_range):
+    # Round outwards to a millisecond, so the boundary integrations are included.
+    low = math.floor(time_range[0] * 1000) / 1000
+    high = math.ceil(time_range[1] * 1000) / 1000
+    return '{}..{}'.format(mjd_seconds_to_mvtime(low), mjd_seconds_to_mvtime(high))
+
+
+def _dp3_freq_range(freq_range):
+    # Round outwards to a Hz, so the boundary channels are included.
+    return '{:.6f}..{:.6f} MHz'.format(math.floor(freq_range[0]) / 1e6, math.ceil(freq_range[1]) / 1e6)
+
+
+def make_dp3_parset(flag_records, parset_name, source_h5file, flagged_h5file):
+    """ Make a DP3 parset that applies the flags made in H5plot to the visibilities of a Measurement Set.
+
+    Visibilities have no directions, and the DP3 preflagger flags all correlations, so flags in different
+    directions or polarizations of the same stations, times and frequencies become a single keyword set.
+
+    Args:
+        flag_records (list): dicts describing the flag actions, as made by H5PlotGUI.update_waterfall_weights.
+        parset_name (str): file name of the parset, used in the usage example.
+        source_h5file (str): H5parm the flags were made in.
+        flagged_h5file (str): H5parm the flags were written to.
+    Returns:
+        parset (str): the parset text.
+    """
+    keyword_sets = {}
+    for record in flag_records:
+        key = (tuple(record['stations']) if record['stations'] is not None else None, record['time'], record['freq'])
+        keyword_sets.setdefault(key, []).append(record)
+    lines = [
+        '# DP3 flagging parset written by H5plot {} on {}.'.format(__version__, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+        '# Flags made in {}'.format(source_h5file),
+        '# and written to {}.'.format(flagged_h5file),
+        '#',
+        '# Apply the flags to a Measurement Set with:',
+        '#     DP3 {} msin=<your.ms>'.format(parset_name),
+        '# This writes the flags into the FLAG column of that Measurement Set (msout=.).',
+        '#',
+        '# Visibilities have no directions, so a flag in any direction flags the visibilities of that station, time',
+        '# and frequency range. The DP3 preflagger flags all correlations, whichever polarizations were flagged in the',
+        '# solutions. Time and frequency ranges cover the full solution intervals. A station flag applies to all',
+        '# baselines with that station.',
+        '',
+        'msout = .',
+        'steps = [preflag]',
+        'preflag.type = preflagger',
+    ]
+    set_lines = []
+    names = []
+    for number, ((stations, time_range, freq_range), records) in enumerate(keyword_sets.items(), start=1):
+        name = 'f{}'.format(number)
+        names.append(name)
+        set_lines.append('')
+        for record in records:
+            region = record['region']
+            description = '{}/{}: {}, solution times {}:{}, solution frequencies {}:{}'.format(
+                record['solset'], record['soltab'],
+                'all stations' if record['stations'] is None else ', '.join(record['stations']),
+                region[0], region[1], region[2], region[3])
+            if record['pols'] is not None:
+                description += ', polarizations ' + ', '.join(record['pols'])
+            if record['dirs'] is not None:
+                description += ', directions ' + ', '.join(record['dirs'])
+            set_lines.append('# ' + description)
+        if time_range is None:
+            set_lines.append('# The solutions have a single time, so all times are flagged.')
+        if freq_range is None:
+            set_lines.append('# The solutions have no frequency axis or a single frequency, so all channels are flagged.')
+        if stations is not None:
+            set_lines.append('preflag.{}.baseline = [{}]'.format(name, ', '.join(stations)))
+        if time_range is not None:
+            set_lines.append('preflag.{}.abstime = [{}]'.format(name, _dp3_time_range(time_range)))
+        if freq_range is not None:
+            set_lines.append('preflag.{}.freqrange = [{}]'.format(name, _dp3_freq_range(freq_range)))
+        if stations is None and time_range is None and freq_range is None:
+            # A keyword set needs at least one selection; all stations matches all data.
+            set_lines.append('preflag.{}.baseline = [*]'.format(name))
+    lines.append('preflag.expr = ' + ' or '.join(names))
+    return '\n'.join(lines + set_lines) + '\n'
+
+
+LOGGER = logging.getLogger('H5plot_logger')
+_LOG_FILE_HANDLER = None
+
+
 if __name__ == '__main__':
     print('H5Plot ' + __version__)
     print('Author: Frits Sweijen (frits.sweijen@gmail.com)')
@@ -2693,21 +2990,18 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Interactive plotter to explore LOFAR H5parm solutions.')
     parser.add_argument('FILENAME')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging.')
     args = parser.parse_args()
 
     H5FILE = lh5.h5parm(args.FILENAME, readonly=True)
     # Set up for logging output.
-    LOGGER = logging.getLogger('H5plot_logger')
-    if '--debug' in sys.argv:
+    if args.debug:
         LOGGER.setLevel(logging.DEBUG)
     else:
         LOGGER.setLevel(logging.INFO)
 
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    LOGFILEH = logging.FileHandler('h5plot.log')
-    LOGFILEH.setLevel(logging.DEBUG)
-    LOGFILEH.setFormatter(formatter)
-    LOGGER.addHandler(LOGFILEH)
+    add_log_file_handler(LOGGER)
     LOGSTREAM = logging.StreamHandler()
     LOGSTREAM.setLevel(logging.DEBUG)
     LOGSTREAM.setFormatter(formatter)
